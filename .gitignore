@@ -1,0 +1,32 @@
+# Local / machine specific — never commit
+local.properties
+secrets.properties
+keystore.properties
+keystore/
+
+# Signing material
+*.jks
+*.keystore
+
+# Gradle / build output
+.gradle/
+.kotlin/
+build/
+dist/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# Logs
+*.log
+
+# 引导截图的原始素材（成品已压进 res/drawable-nodpi/，根目录这些是临时文件）
+/*.png
+
+# NOTE: gradle/wrapper/gradle-wrapper.jar IS tracked on purpose (standard for Android repos).
+# Do not add a global `*.jar` ignore rule here.
