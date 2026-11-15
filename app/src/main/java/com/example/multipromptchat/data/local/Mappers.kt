@@ -46,5 +46,6 @@ fun MessageEntity.toDomain(): Message = Message(
     role = MessageRole.fromApi(role),
     content = content,
     reasoning = reasoning,
+    imagePath = imagePath,
     createdAt = createdAt,
 )

@@ -1,5 +1,6 @@
 package com.example.multipromptchat.ui.navigation
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -7,12 +8,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -26,6 +29,7 @@ import com.example.multipromptchat.ui.onboarding.OnboardingScreen
 import com.example.multipromptchat.ui.prompts.PromptEditScreen
 import com.example.multipromptchat.ui.prompts.PromptListScreen
 import com.example.multipromptchat.ui.settings.SettingsScreen
+import com.example.multipromptchat.ui.theme.LocalWallpaperActive
 
 object Routes {
     const val CONVERSATIONS = "conversations"
@@ -57,32 +61,61 @@ fun AppNavHost(container: AppContainer) {
     val showOnboarding = manualOnboarding ||
         (apiKeyLoaded && !onboardingDone && apiKey.isNullOrBlank())
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Scaffold(
-            containerColor = MaterialTheme.colorScheme.background,
-            contentWindowInsets = WindowInsets(0, 0, 0, 0),
-            bottomBar = {
-                if (showBottomBar) {
-                    BottomBar(
-                        currentRoute = currentRoute,
-                        onSelect = { route ->
-                            if (route != currentRoute) {
-                                navController.navigate(route) {
-                                    popUpTo(Routes.CONVERSATIONS) { saveState = true }
-                                    launchSingleTop = true
-                                    restoreState = true
+    // 1.2：自定义背景图。文件缺失 / 解码失败时自动退回纯色背景。
+    val appearance by container.settingsRepository.appearance.collectAsState()
+    val wallpaper = remember(appearance.backgroundPath) {
+        appearance.backgroundPath?.let { path ->
+            runCatching { android.graphics.BitmapFactory.decodeFile(path) }.getOrNull()
+        }
+    }
+    val hasWallpaper = wallpaper != null
+
+    CompositionLocalProvider(LocalWallpaperActive provides hasWallpaper) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (wallpaper != null) {
+                androidx.compose.foundation.Image(
+                    bitmap = wallpaper.asImageBitmap(),
+                    contentDescription = null,
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                // 蒙层：保证卡片与文字在任何图片上都可读。
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background.copy(alpha = 0.82f)),
+                )
+            }
+
+            Scaffold(
+                containerColor = if (hasWallpaper) {
+                    androidx.compose.ui.graphics.Color.Transparent
+                } else {
+                    MaterialTheme.colorScheme.background
+                },
+                contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                bottomBar = {
+                    if (showBottomBar) {
+                        BottomBar(
+                            currentRoute = currentRoute,
+                            onSelect = { route ->
+                                if (route != currentRoute) {
+                                    navController.navigate(route) {
+                                        popUpTo(Routes.CONVERSATIONS) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
                                 }
-                            }
-                        },
-                    )
-                }
-            },
-        ) { padding ->
-            NavHost(
-                navController = navController,
-                startDestination = Routes.CONVERSATIONS,
-                modifier = Modifier.padding(padding),
-            ) {
+                            },
+                        )
+                    }
+                },
+            ) { padding ->
+                NavHost(
+                    navController = navController,
+                    startDestination = Routes.CONVERSATIONS,
+                    modifier = Modifier.padding(padding),
+                ) {
                 composable(Routes.CONVERSATIONS) {
                     ConversationListScreen(
                         container = container,
@@ -169,6 +202,7 @@ fun AppNavHost(container: AppContainer) {
                     manualOnboarding = false
                 },
             )
+        }
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.example.multipromptchat.data.repository
 
+import com.example.multipromptchat.data.image.ImageStore
 import com.example.multipromptchat.data.local.ConversationDao
 import com.example.multipromptchat.data.local.MessageDao
 import com.example.multipromptchat.data.local.MessageEntity
@@ -9,6 +10,7 @@ import com.example.multipromptchat.data.remote.ChatMessage
 import com.example.multipromptchat.data.remote.CompletionResult
 import com.example.multipromptchat.data.remote.DeepSeekClient
 import com.example.multipromptchat.data.remote.KeyCheckResult
+import com.example.multipromptchat.data.remote.ModelListResult
 import com.example.multipromptchat.data.remote.StreamChunk
 import com.example.multipromptchat.data.remote.TokenUsage
 import com.example.multipromptchat.domain.DEFAULT_CONVERSATION_TITLE
@@ -17,6 +19,7 @@ import com.example.multipromptchat.domain.MessageRole
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.takeWhile
+import java.io.File
 
 /** Events surfaced to the chat screen while a reply streams in. */
 sealed interface ChatStreamEvent {
@@ -35,7 +38,11 @@ class ChatRepository(
     private val settingsRepository: SettingsRepository,
 ) {
 
-    suspend fun appendUserMessage(conversationId: Long, text: String) {
+    suspend fun appendUserMessage(
+        conversationId: Long,
+        text: String,
+        imagePath: String? = null,
+    ) {
         val now = System.currentTimeMillis()
         messageDao.insert(
             MessageEntity(
@@ -43,6 +50,7 @@ class ChatRepository(
                 role = MessageRole.USER.apiValue,
                 content = text,
                 reasoning = null,
+                imagePath = imagePath,
                 createdAt = now,
             )
         )
@@ -58,6 +66,7 @@ class ChatRepository(
                 role = MessageRole.ASSISTANT.apiValue,
                 content = content,
                 reasoning = reasoning?.takeIf { it.isNotBlank() },
+                imagePath = null,
                 createdAt = now,
             )
         )
@@ -80,7 +89,9 @@ class ChatRepository(
         val apiKey = settingsRepository.getApiKey()
         if (apiKey.isNullOrBlank()) return
 
-        val generated = runCatching { deepSeekClient.generateTitle(apiKey, first) }.getOrNull()
+        val generated = runCatching {
+            deepSeekClient.generateTitle(apiKey = apiKey, userMessage = first, model = currentModel())
+        }.getOrNull()
         if (generated.isNullOrBlank()) return
 
         conversationDao.rename(conversationId, generated, System.currentTimeMillis())
@@ -102,6 +113,13 @@ class ChatRepository(
      * 不改变原有发送/流式逻辑。
      */
     suspend fun testConnection(apiKey: String): KeyCheckResult = deepSeekClient.checkApiKey(apiKey)
+
+    /** 1.2：拉取可用模型，供设置页选择。 */
+    suspend fun fetchModels(apiKey: String): ModelListResult = deepSeekClient.listModels(apiKey)
+
+    /** 1.2：当前生效的模型（设置里选的，兜底 DEFAULT_MODEL）。 */
+    private fun currentModel(): String =
+        settingsRepository.modelName.value.ifBlank { DEFAULT_MODEL }
 
     /**
      * Builds the request from the conversation's *current* prompt binding plus the
@@ -129,11 +147,12 @@ class ChatRepository(
 
         // 增量 C：这些设置只影响“后续请求”，不改动任何已存数据。
         val experience = settingsRepository.chatExperience.value
+        val model = currentModel()
 
         val history = messageDao.getByConversation(conversationId)
             .map { it.toDomain() }
             .filter { it.role == MessageRole.USER || it.role == MessageRole.ASSISTANT }
-            .filter { it.content.isNotBlank() }
+            .filter { it.content.isNotBlank() || it.imagePath != null }
             // 增量 C-3：只带最近 N 条历史；system 提示词下面单独加，永远保留。
             .takeLast(experience.contextMessageCount.coerceAtLeast(1))
 
@@ -141,7 +160,18 @@ class ChatRepository(
             if (systemPrompt.isNotBlank()) {
                 add(ChatMessage(role = MessageRole.SYSTEM.apiValue, content = systemPrompt))
             }
-            history.forEach { add(ChatMessage(role = it.role.apiValue, content = it.content)) }
+            history.forEach { message ->
+                // 1.2：带图消息按 OpenAI 兼容的 image_url 重新附上（转 data URL）。
+                val imageDataUrl = message.imagePath
+                    ?.let { path -> runCatching { ImageStore.toDataUrl(File(path)) }.getOrNull() }
+                add(
+                    ChatMessage(
+                        role = message.role.apiValue,
+                        content = message.content,
+                        imageDataUrl = imageDataUrl,
+                    )
+                )
+            }
         }
 
         if (!experience.streamingOutput) {
@@ -149,7 +179,7 @@ class ChatRepository(
             when (
                 val result = deepSeekClient.complete(
                     apiKey = apiKey,
-                    model = DEFAULT_MODEL,
+                    model = model,
                     messages = apiMessages,
                     temperature = temperature,
                     topP = topP,
@@ -177,7 +207,7 @@ class ChatRepository(
         var sawError = false
         deepSeekClient.streamChat(
             apiKey = apiKey,
-            model = DEFAULT_MODEL,
+            model = model,
             messages = apiMessages,
             temperature = temperature,
             topP = topP,

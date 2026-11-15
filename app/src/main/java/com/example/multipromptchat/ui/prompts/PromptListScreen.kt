@@ -41,6 +41,7 @@ import com.example.multipromptchat.AppContainer
 import com.example.multipromptchat.domain.PromptTemplate
 import com.example.multipromptchat.domain.PromptUsage
 import com.example.multipromptchat.ui.Strings
+import com.example.multipromptchat.ui.theme.screenBackgroundColor
 import com.example.multipromptchat.ui.components.EmptyState
 import com.example.multipromptchat.ui.components.ErrorBanner
 import com.example.multipromptchat.ui.components.HarmonyCard
@@ -65,7 +66,7 @@ fun PromptListScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(screenBackgroundColor())
             .statusBarsPadding(),
     ) {
         Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {

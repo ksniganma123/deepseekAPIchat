@@ -69,6 +69,8 @@ data class Message(
     val role: MessageRole,
     val content: String,
     val reasoning: String? = null,
+    /** 1.2：用户消息附带的图片路径（本机落盘），没有则为 null。 */
+    val imagePath: String? = null,
     val createdAt: Long = 0L,
 )
 

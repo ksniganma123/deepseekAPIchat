@@ -88,9 +88,10 @@ class ChatViewModel(
         initialValue = ChatUiState(),
     )
 
-    fun sendMessage(raw: String) {
+    fun sendMessage(raw: String, imagePath: String? = null) {
         val text = raw.trim()
-        if (text.isEmpty() || isStreaming.value) return
+        // 1.2：允许「只发图片不发文字」。
+        if ((text.isEmpty() && imagePath == null) || isStreaming.value) return
         if (settingsRepository.getApiKey().isNullOrBlank()) {
             errorMessage.value = Strings.apiKeyMissing
             return
@@ -106,7 +107,7 @@ class ChatViewModel(
             val reasoning = StringBuilder()
 
             try {
-                chatRepository.appendUserMessage(conversationId, text)
+                chatRepository.appendUserMessage(conversationId, text, imagePath)
                 // 增量 C-2：标题生成单独跑，不阻塞回复；失败自己吞掉。
                 viewModelScope.launch {
                     runCatching { chatRepository.autoGenerateTitleIfNeeded(conversationId) }

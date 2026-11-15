@@ -61,6 +61,27 @@
 
 见上表（现象 / 根因 / 三层修复 / 验证）。要改流式相关代码时，**必须**保留 `close()` 和 `takeWhile` 这两道防线。
 
+### F. 1.2：外观自定义 + 图片对话
+
+| 项 | 内容 |
+| --- | --- |
+| 版本 | versionCode 1 → 2，versionName 1.0.0 → 1.2 |
+| 外观-背景图 | 设置页选图 → `ImageStore.import(DIR_WALLPAPER, maxEdge=1600)` → 路径存 plain prefs → `AppNavHost` 里 `Image` + 0.82 透明蒙层铺底，Scaffold 与各页根背景转透明（`LocalWallpaperActive` / `screenBackgroundColor()`）。文件丢失/解码失败自动回落纯色 |
+| 外观-主色调 | `AppearanceSettings.accentArgb`（默认 `DEFAULT_ACCENT_ARGB`）→ `MultipromptTheme(accentSeed)` → `deriveAccentTones()` 派生 primary/container（HSL，饱和度收在 0.25~0.75）。8 个预设色 + 色相滑杆，slider 每帧写入，实时生效 |
+| 图片对话 | 输入框 ⨁ 选图 → 压缩落盘 `filesDir/chat_images` → `MessageEntity.imagePath`（DB v2→v3，新增 `image_path TEXT`，`MIGRATION_2_3`）→ 发送时 `ChatMessage.imageDataUrl` 转成 `image_url` 多模态数组；历史里的图按上下文一并重发 |
+| 限制 | 原图 ≤ 8 MB、单条 1 张、压缩后 ≤ 1 MB / 最长边 1280；格式 JPEG/PNG/WebP（其它依赖系统解码）；是否识别取决于服务端模型能力，不支持时原样显示接口错误 |
+| 模型自动获取 | 设置页「连接码」分组内：`DeepSeekClient.listModels()` 调 `GET /models` → `ChatRepository.fetchModels()` → `SettingsViewModel.fetchModels()`；选中项存 `SettingsRepository.modelName`（key `chat_model`，默认 `DEFAULT_MODEL`），聊天与自动标题都用它；id 含 flash/vl/vision 的模型打「可识图」标签，`deepseek-flash` 支持图片识别 |
+
+### G. 聊天页 Markdown 渲染
+
+| 项 | 内容 |
+| --- | --- |
+| 实现 | 自研轻量渲染：`ui/components/MarkdownParser.kt`（块级解析）+ `MarkdownText.kt`（渲染、行内样式、代码高亮） |
+| 降级策略 | **流式中不渲染 Markdown**：`StreamingBubble` 继续用纯 `Text`；回复落库后由 `MessageBubble` 用 `MarkdownText` 做一次完整渲染。用户消息永远纯文本 |
+| 代码块 | 等宽 + 轻量词法高亮（注释/字符串/数字/关键字，颜色取 `theme/Color.kt` 的 `Code*` 常量）+ `horizontalScroll` + 右上角「复制」（`LocalClipboardManager`） |
+| 容错 | 解析异常/空结果 → 退回纯文本；未闭合的 ``` 也会被当成代码块吃掉（已用 14 条断言脚本验证） |
+| 为什么不用库 | compose-markdown 在 JitPack（额外仓库）；multiplatform-markdown-renderer-m3 会引入 Compose Multiplatform material3，与 androidx 冲突 |
+
 ### 引导的判定规则（重要）
 
 ```

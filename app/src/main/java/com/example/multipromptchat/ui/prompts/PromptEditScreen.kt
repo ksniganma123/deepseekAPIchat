@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.multipromptchat.AppContainer
 import com.example.multipromptchat.ui.Strings
+import com.example.multipromptchat.ui.theme.screenBackgroundColor
 import com.example.multipromptchat.ui.components.ErrorBanner
 import com.example.multipromptchat.ui.components.HarmonyCard
 import com.example.multipromptchat.ui.components.LoadingBox
@@ -63,7 +64,7 @@ fun PromptEditScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(screenBackgroundColor()),
     ) {
         Row(
             modifier = Modifier

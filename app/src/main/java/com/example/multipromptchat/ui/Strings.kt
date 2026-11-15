@@ -96,7 +96,7 @@ object Strings {
     const val aboutSection = "关于"
     const val appName = "deepseekAPIchat"
     const val appTagline = "多 Prompt 人设 · 流式对话"
-    const val appVersion = "版本 1.0.0"
+    const val appVersion = "版本 1.2"
     const val copyrightHolder = "© 2026 K5NGM_JiYuxi"
     const val licenseSummary = "本项目以 MIT 协议开源：可自由使用、修改、分发，请保留版权声明与许可声明。"
     const val viewLicense = "查看许可证文本"
@@ -212,6 +212,36 @@ object Strings {
     const val promptGuideGood2 =
         "你是一名有十年经验的简历顾问，先问我目标岗位，再逐条指出简历问题，每条给出修改示例。"
 
+    // ---- 1.2：外观（背景图 + 主色调） -----------------------------------
+    const val modelSectionTitle = "模型"
+    const val modelFetch = "获取可用模型"
+    const val modelFetching = "正在获取…"
+    const val modelHint = "图片对话需要支持识图的模型（例如 deepseek-flash）"
+    const val modelNeedKey = "先保存密钥，再获取模型列表"
+    const val modelVisionTag = "可识图"
+
+    const val appearanceBackgroundTitle = "聊天背景图"
+    const val appearanceBackgroundDesc = "选一张本地图片铺在界面最底层，卡片与文字会自动加蒙层保证可读"
+    const val appearanceBackgroundPick = "选择图片"
+    const val appearanceBackgroundRemove = "移除背景"
+    const val appearanceBackgroundEmpty = "当前使用纯色背景"
+    const val appearanceBackgroundBusy = "正在处理图片…"
+    const val appearanceAccentTitle = "主色调"
+    const val appearanceAccentDesc = "影响按钮、标签、选中态等强调色，改动立即生效"
+    const val appearanceAccentReset = "恢复默认"
+    const val appearanceAccentDefault = "默认蓝"
+
+    // 图片相关的通用上限说明（与 ImageStore 常量保持一致）
+    const val imageLimitsHint = "支持 JPEG / PNG / WebP，单张不超过 8 MB"
+    const val imageProcessing = "正在压缩图片…"
+
+    // 聊天里的图片附件
+    const val attachImage = "添加图片"
+    const val copyCode = "复制"
+    const val copied = "已复制"
+    const val removeImage = "移除图片"
+    const val imageOnlyMessage = "（图片）"
+
     // ---- 增量 C：聊天体验设置 -------------------------------------------
     const val chatExperienceSection = "聊天体验"
     const val sendShortcutTitle = "发送快捷键"
@@ -252,6 +282,21 @@ object Strings {
     fun charCount(count: Int): String = "已写 $count 字"
 
     fun contextCountValue(count: Int): String = "最近 $count 条"
+
+    fun modelFetched(count: Int): String = "已获取 $count 个模型，点选即生效"
+
+    // ---- 1.2：图片附件的错误提示（都用人话） ----------------------------
+    fun imageAttached(sizeKb: Long): String = "已附加 1 张图片（约 ${sizeKb} KB）"
+
+    fun imageTooLarge(maxMb: Int): String = "图片太大了，请换一张小于 ${maxMb} MB 的"
+
+    fun imageUnsupported(): String = "这个格式暂时不支持，请换成 JPEG / PNG / WebP"
+
+    fun imageDecodeFailed(): String = "图片读不出来，换一张试试"
+
+    fun imageReadFailed(): String = "读取图片失败，请重试"
+
+    fun imagePickFailed(): String = "没能打开相册，请检查系统权限后重试"
 
     fun promptSelectedCount(count: Int): String = "已选 $count 项"
 

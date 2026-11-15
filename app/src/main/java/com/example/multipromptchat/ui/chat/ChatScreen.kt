@@ -1,5 +1,16 @@
 package com.example.multipromptchat.ui.chat
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import com.example.multipromptchat.data.image.ImageStore
+import kotlinx.coroutines.launch
+import java.io.File
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -28,6 +39,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -71,11 +83,13 @@ import com.example.multipromptchat.domain.Message
 import com.example.multipromptchat.domain.MessageRole
 import com.example.multipromptchat.domain.PromptTemplate
 import com.example.multipromptchat.ui.Strings
+import com.example.multipromptchat.ui.theme.screenBackgroundColor
 import com.example.multipromptchat.ui.components.ApiKeyMissingCard
 import com.example.multipromptchat.ui.components.EmptyState
 import com.example.multipromptchat.ui.components.ErrorBanner
 import com.example.multipromptchat.ui.components.HarmonyCard
 import com.example.multipromptchat.ui.components.LoadingBox
+import com.example.multipromptchat.ui.components.MarkdownText
 import com.example.multipromptchat.ui.components.PromptTag
 import com.example.multipromptchat.ui.theme.SheetShape
 import kotlinx.coroutines.delay
@@ -103,10 +117,42 @@ fun ChatScreen(
     var showPromptSheet by remember { mutableStateOf(false) }
     var pendingPrompt by remember { mutableStateOf<PromptTemplate?>(null) }
 
+    // ---- 1.2：图片附件 ----------------------------------------------------
+    var attachedPath by remember { mutableStateOf<String?>(null) }
+    var attachedBytes by remember { mutableStateOf(0L) }
+    var imageBusy by remember { mutableStateOf(false) }
+    var imageError by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    val appContext = LocalContext.current
+    val imagePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        if (uri != null) {
+            imageBusy = true
+            scope.launch {
+                when (val result = ImageStore.import(appContext, uri, ImageStore.DIR_CHAT)) {
+                    is ImageStore.Result.Success -> {
+                        ImageStore.deleteQuietly(attachedPath)
+                        attachedPath = result.file.absolutePath
+                        attachedBytes = result.bytes
+                        imageError = null
+                    }
+                    is ImageStore.Result.Error -> imageError = when (result.failure) {
+                        ImageStore.Failure.TOO_LARGE -> Strings.imageTooLarge(8)
+                        ImageStore.Failure.UNSUPPORTED_FORMAT -> Strings.imageUnsupported()
+                        ImageStore.Failure.DECODE_FAILED -> Strings.imageDecodeFailed()
+                        ImageStore.Failure.IO_ERROR -> Strings.imageReadFailed()
+                    }
+                }
+                imageBusy = false
+            }
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(screenBackgroundColor()),
     ) {
         ChatHeader(
             title = state.conversation?.title ?: Strings.tabConversations,
@@ -148,6 +194,14 @@ fun ChatScreen(
             )
         }
 
+        imageError?.let { message ->
+            ErrorBanner(
+                message = message,
+                onDismiss = { imageError = null },
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+            )
+        }
+
         val activeConversation = state.conversation
         ChatInputBar(
             value = input,
@@ -159,10 +213,26 @@ fun ChatScreen(
             } else {
                 null
             },
+            attachedImage = attachedPath?.let { File(it) },
+            attachedBytes = attachedBytes,
+            imageBusy = imageBusy,
+            onPickImage = {
+                imagePicker.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                )
+            },
+            onRemoveImage = {
+                ImageStore.deleteQuietly(attachedPath)
+                attachedPath = null
+                attachedBytes = 0L
+            },
             onSend = {
                 val text = input
+                val image = attachedPath
                 input = ""
-                viewModel.sendMessage(text)
+                attachedPath = null
+                attachedBytes = 0L
+                viewModel.sendMessage(text, image)
             },
             onStop = viewModel::stopGeneration,
         )
@@ -336,16 +406,40 @@ private fun MessageBubble(message: Message) {
             shadowElevation = if (isUser) 0.dp else 1.dp,
             modifier = Modifier.widthIn(max = 300.dp),
         ) {
-            Text(
-                text = message.content,
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (isUser) {
-                    MaterialTheme.colorScheme.onPrimaryContainer
-                } else {
-                    MaterialTheme.colorScheme.onSurface
-                },
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            )
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                // 1.2：用户消息若带图，先把图显示出来
+                val attached = message.imagePath
+                if (attached != null) {
+                    val bitmap = remember(attached) {
+                        runCatching { android.graphics.BitmapFactory.decodeFile(attached) }.getOrNull()
+                    }
+                    if (bitmap != null) {
+                        Image(
+                            bitmap = bitmap.asImageBitmap(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 200.dp)
+                                .clip(MaterialTheme.shapes.medium),
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                }
+                if (message.content.isNotBlank()) {
+                    if (isUser) {
+                        // 用户消息保持纯文本：输入的是原文，不该被当成 Markdown 解释
+                        Text(
+                            text = message.content,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                    } else {
+                        // 助手消息：流式结束后再做一次完整 Markdown 渲染
+                        MarkdownText(markdown = message.content)
+                    }
+                }
+            }
         }
     }
 }
@@ -393,9 +487,16 @@ private fun ChatInputBar(
     isStreaming: Boolean,
     sendOnEnter: Boolean,
     tokenSummary: String?,
+    attachedImage: File?,
+    attachedBytes: Long,
+    imageBusy: Boolean,
+    onPickImage: () -> Unit,
+    onRemoveImage: () -> Unit,
     onSend: () -> Unit,
     onStop: () -> Unit,
 ) {
+    val canSend = value.isNotBlank() || attachedImage != null
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -404,7 +505,73 @@ private fun ChatInputBar(
             .padding(horizontal = 20.dp)
             .padding(top = 4.dp, bottom = 12.dp),
     ) {
+        // 1.2：已选图片的预览条（发送前可移除）
+        if (attachedImage != null) {
+            Surface(
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            ) {
+                Row(
+                    modifier = Modifier.padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    val preview = remember(attachedImage.absolutePath) {
+                        runCatching {
+                            android.graphics.BitmapFactory.decodeFile(attachedImage.absolutePath)
+                        }.getOrNull()
+                    }
+                    if (preview != null) {
+                        Image(
+                            bitmap = preview.asImageBitmap(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(MaterialTheme.shapes.small),
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                    }
+                    Text(
+                        text = Strings.imageAttached(attachedBytes / 1024),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                    )
+                    IconButton(onClick = onRemoveImage, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = Strings.removeImage,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
+            }
+        }
+
         Row(verticalAlignment = Alignment.Bottom) {
+            // 1.2：添加图片
+            IconButton(
+                onClick = onPickImage,
+                enabled = !imageBusy && !isStreaming,
+                modifier = Modifier.size(44.dp),
+            ) {
+                if (imageBusy) {
+                    CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.primary,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(16.dp),
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Filled.AddCircle,
+                        contentDescription = Strings.attachImage,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(4.dp))
             OutlinedTextField(
                 value = value,
                 onValueChange = onValueChange,
@@ -424,7 +591,7 @@ private fun ChatInputBar(
                     KeyboardOptions.Default
                 },
                 keyboardActions = if (sendOnEnter) {
-                    KeyboardActions(onSend = { if (value.isNotBlank()) onSend() })
+                    KeyboardActions(onSend = { if (canSend) onSend() })
                 } else {
                     KeyboardActions.Default
                 },
@@ -440,7 +607,7 @@ private fun ChatInputBar(
                         handleEnterKey(
                             event = event,
                             sendOnEnter = sendOnEnter,
-                            canSend = value.isNotBlank(),
+                            canSend = canSend,
                             onSend = onSend,
                         )
                     },
@@ -448,7 +615,7 @@ private fun ChatInputBar(
             Spacer(modifier = Modifier.width(10.dp))
             SendButton(
                 isStreaming = isStreaming,
-                canSend = value.isNotBlank(),
+                canSend = canSend,
                 onSend = onSend,
                 onStop = onStop,
             )

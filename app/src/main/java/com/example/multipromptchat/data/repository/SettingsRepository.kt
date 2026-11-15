@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.example.multipromptchat.domain.DEFAULT_MODEL
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,6 +14,22 @@ enum class ThemeMode { SYSTEM, LIGHT, DARK }
 const val CONTEXT_MESSAGES_MIN = 5
 const val CONTEXT_MESSAGES_MAX = 50
 const val CONTEXT_MESSAGES_DEFAULT = 20
+
+/** 默认主色调（与 ui/theme/Color.kt 的 LightAccent 一致） */
+const val DEFAULT_ACCENT_ARGB = 0xFF3A7AFEL
+
+/**
+ * 1.2 外观设置：自定义背景图 + 自定义主色调。两者都有默认值兜底，
+ * 背景图为空 / 文件丢失时退回纯色背景。
+ */
+data class AppearanceSettings(
+    /** 背景图落盘绝对路径；null = 不使用图片背景。 */
+    val backgroundPath: String? = null,
+    /** 主色调种子色（ARGB）。 */
+    val accentArgb: Long = DEFAULT_ACCENT_ARGB,
+) {
+    val hasBackground: Boolean get() = !backgroundPath.isNullOrBlank()
+}
 
 /**
  * 增量 C：设置页「聊天体验」分组。整体作为一个不可变快照，改动后立即被
@@ -70,6 +87,14 @@ class SettingsRepository(context: Context) {
     private val _chatExperience = MutableStateFlow(ChatExperienceSettings())
     val chatExperience: StateFlow<ChatExperienceSettings> = _chatExperience.asStateFlow()
 
+    /** 1.2：当前选中的模型（设置页拉取 /models 后选择，默认 DEFAULT_MODEL）。 */
+    private val _modelName = MutableStateFlow(DEFAULT_MODEL)
+    val modelName: StateFlow<String> = _modelName.asStateFlow()
+
+    /** 1.2：外观（背景图 + 主色调），改动即时生效。 */
+    private val _appearance = MutableStateFlow(AppearanceSettings())
+    val appearance: StateFlow<AppearanceSettings> = _appearance.asStateFlow()
+
     private val _themeMode = MutableStateFlow(ThemeMode.SYSTEM)
     val themeMode: StateFlow<ThemeMode> = _themeMode.asStateFlow()
 
@@ -111,6 +136,24 @@ class SettingsRepository(context: Context) {
             showTokenUsage = runCatching {
                 plainPreferences.getBoolean(KEY_SHOW_TOKEN_USAGE, defaults.showTokenUsage)
             }.getOrDefault(defaults.showTokenUsage),
+        )
+
+        _modelName.value = runCatching {
+            plainPreferences.getString(KEY_CHAT_MODEL, null)
+        }.getOrNull()?.takeIf { it.isNotBlank() } ?: DEFAULT_MODEL
+
+        val storedBackground = runCatching {
+            plainPreferences.getString(KEY_APPEARANCE_BACKGROUND, null)
+        }.getOrNull()
+        // 默认值兜底：路径存在但文件已被删掉时，视为没有背景图。
+        val validBackground = storedBackground?.takeIf { path ->
+            runCatching { java.io.File(path).isFile }.getOrDefault(false)
+        }
+        _appearance.value = AppearanceSettings(
+            backgroundPath = validBackground,
+            accentArgb = runCatching {
+                plainPreferences.getLong(KEY_APPEARANCE_ACCENT, DEFAULT_ACCENT_ARGB)
+            }.getOrDefault(DEFAULT_ACCENT_ARGB),
         )
     }
 
@@ -164,9 +207,30 @@ class SettingsRepository(context: Context) {
         _onboardingDone.value = done
     }
 
+    /** 1.2：选择模型 */
+    fun setModelName(id: String) {
+        val trimmed = id.trim()
+        if (trimmed.isEmpty()) return
+        plainPreferences.edit().putString(KEY_CHAT_MODEL, trimmed).apply()
+        _modelName.value = trimmed
+    }
+
+    /** 1.2：设置背景图（传 null 表示移除） */
+    fun setBackgroundPath(path: String?) {
+        val current = _appearance.value
+        plainPreferences.edit().putString(KEY_APPEARANCE_BACKGROUND, path).apply()
+        _appearance.value = current.copy(backgroundPath = path)
+    }
+
+    /** 1.2：设置主色调（ARGB），即时生效 */
+    fun setAccentColor(argb: Long) {
+        val current = _appearance.value
+        plainPreferences.edit().putLong(KEY_APPEARANCE_ACCENT, argb).apply()
+        _appearance.value = current.copy(accentArgb = argb)
+    }
+
     /** 增量 C：「聊天体验」的任一开关/滑块都走这里，落盘并立即生效。 */
-    fun updateChatExperience(transform: (ChatExperienceSettings) -> ChatExperienceSettings) {
-        val current = _chatExperience.value
+    fun updateChatExperience(transform: (ChatExperienceSettings) -> ChatExperienceSettings) {        val current = _chatExperience.value
         val next = transform(current).let { candidate ->
             candidate.copy(
                 contextMessageCount = candidate.contextMessageCount
@@ -203,5 +267,8 @@ class SettingsRepository(context: Context) {
         const val KEY_CONTEXT_MESSAGES = "chat_context_messages"
         const val KEY_STREAMING = "chat_streaming"
         const val KEY_SHOW_TOKEN_USAGE = "chat_show_token_usage"
+        const val KEY_CHAT_MODEL = "chat_model"
+        const val KEY_APPEARANCE_BACKGROUND = "appearance_background_path"
+        const val KEY_APPEARANCE_ACCENT = "appearance_accent_argb"
     }
 }

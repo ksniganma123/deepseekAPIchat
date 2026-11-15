@@ -97,6 +97,9 @@ data class MessageEntity(
     /** Raw `reasoning_content` of the reply, if the model sent one. Not rendered in v1. */
     @ColumnInfo(name = "reasoning")
     val reasoning: String? = null,
+    /** 1.2：用户消息附带的图片（落盘绝对路径），助手消息为 null。 */
+    @ColumnInfo(name = "image_path")
+    val imagePath: String? = null,
     @ColumnInfo(name = "created_at")
     val createdAt: Long,
 )

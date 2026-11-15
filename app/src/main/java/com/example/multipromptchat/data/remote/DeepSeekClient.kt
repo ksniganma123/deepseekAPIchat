@@ -23,7 +23,12 @@ import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 
 /** One entry of the `messages` array sent to the API. */
-data class ChatMessage(val role: String, val content: String)
+data class ChatMessage(
+    val role: String,
+    val content: String,
+    /** 1.2：OpenAI 兼容的 `image_url`（data URL）。非空时 content 会变成多模态数组。 */
+    val imageDataUrl: String? = null,
+)
 
 /** One step of a streamed reply. */
 sealed interface StreamChunk {
@@ -31,6 +36,20 @@ sealed interface StreamChunk {
     data class Usage(val usage: TokenUsage) : StreamChunk
     data object Done : StreamChunk
     data class Error(val message: String) : StreamChunk
+}
+
+/** 1.2：一个可用模型 */
+data class ModelInfo(
+    val id: String,
+    val ownedBy: String? = null,
+    /** 疑似支持图片输入（含 flash / vl / vision 字样），仅用于界面提示 */
+    val looksVisionCapable: Boolean = false,
+)
+
+/** 1.2：拉取模型列表的结果 */
+sealed interface ModelListResult {
+    data class Success(val models: List<ModelInfo>) : ModelListResult
+    data class Failure(val message: String) : ModelListResult
 }
 
 /** 非流式请求的结果（增量 C-4：关闭流式时走这里）。 */
@@ -163,6 +182,75 @@ class DeepSeekClient(
     }
 
     /**
+     * 1.2：拉取账号可用模型（OpenAI 兼容的 GET /models）。
+     * 只读 id / owned_by，失败返回可读文案。
+     */
+    suspend fun listModels(apiKey: String): ModelListResult = withContext(Dispatchers.IO) {
+        val request = try {
+            Request.Builder()
+                .url(baseUrl.trimEnd('/') + "/models")
+                .addHeader("Authorization", "Bearer " + apiKey.trim())
+                .addHeader("Accept", "application/json")
+                .get()
+                .build()
+        } catch (t: Exception) {
+            return@withContext ModelListResult.Failure("请求构造失败")
+        }
+
+        try {
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    return@withContext ModelListResult.Failure(describeFailure(null, response))
+                }
+                val body = response.body?.string().orEmpty()
+                val json = runCatching { JSONObject(body) }.getOrNull()
+                if (json == null) {
+                    return@withContext ModelListResult.Failure("返回内容无法解析")
+                }
+                val error = json.optJSONObject("error")
+                if (error != null) {
+                    return@withContext ModelListResult.Failure(
+                        error.optString("message").ifBlank { "服务返回错误" }
+                    )
+                }
+                val data = json.optJSONArray("data") ?: JSONArray()
+                val models = buildList {
+                    for (index in 0 until data.length()) {
+                        val item = data.optJSONObject(index) ?: continue
+                        val id = item.optString("id").trim()
+                        if (id.isEmpty()) continue
+                        val ownedBy = if (item.isNull("owned_by")) null else item.optString("owned_by")
+                        val lower = id.lowercase()
+                        add(
+                            ModelInfo(
+                                id = id,
+                                ownedBy = ownedBy,
+                                looksVisionCapable = lower.contains("flash") ||
+                                    lower.contains("vl") ||
+                                    lower.contains("vision"),
+                            )
+                        )
+                    }
+                }.distinctBy { it.id }.sortedBy { it.id }
+
+                if (models.isEmpty()) {
+                    ModelListResult.Failure("这个账号没有返回任何可用模型")
+                } else {
+                    ModelListResult.Success(models)
+                }
+            }
+        } catch (t: SocketTimeoutException) {
+            ModelListResult.Failure("请求超时，请检查网络后重试")
+        } catch (t: UnknownHostException) {
+            ModelListResult.Failure("无法连接网络，请检查网络设置")
+        } catch (t: IOException) {
+            ModelListResult.Failure("网络异常：" + (t.message ?: t.javaClass.simpleName))
+        } catch (t: Exception) {
+            ModelListResult.Failure(t.message ?: t.javaClass.simpleName)
+        }
+    }
+
+    /**
      * 增量 C-4：非流式补全，一次性返回完整回复（关闭「流式输出」时走这里）。
      */
     suspend fun complete(
@@ -216,7 +304,11 @@ class DeepSeekClient(
      * 增量 C-2：用一次极短的非流式请求生成 10 字以内的会话标题。
      * 任何失败都返回 null，调用方保留默认标题、不打扰用户。
      */
-    suspend fun generateTitle(apiKey: String, userMessage: String): String? {
+    suspend fun generateTitle(
+        apiKey: String,
+        userMessage: String,
+        model: String = DEFAULT_MODEL,
+    ): String? {
         val messages = listOf(
             ChatMessage(role = "system", content = TITLE_SYSTEM_PROMPT),
             ChatMessage(role = "user", content = userMessage.take(400)),
@@ -224,7 +316,7 @@ class DeepSeekClient(
         val result = runCatching {
             complete(
                 apiKey = apiKey,
-                model = DEFAULT_MODEL,
+                model = model,
                 messages = messages,
                 temperature = 0.3f,
                 topP = 0.9f,
@@ -271,7 +363,31 @@ class DeepSeekClient(
         messages.forEach { message ->
             val item = JSONObject()
             item.put("role", message.role)
-            item.put("content", message.content)
+            val image = message.imageDataUrl
+            if (image.isNullOrBlank()) {
+                item.put("content", message.content)
+            } else {
+                // OpenAI 兼容的多模态消息：文本 + 图片各一个 part。
+                val parts = JSONArray()
+                if (message.content.isNotBlank()) {
+                    parts.put(
+                        JSONObject().apply {
+                            put("type", "text")
+                            put("text", message.content)
+                        }
+                    )
+                }
+                parts.put(
+                    JSONObject().apply {
+                        put("type", "image_url")
+                        put(
+                            "image_url",
+                            JSONObject().apply { put("url", image) },
+                        )
+                    }
+                )
+                item.put("content", parts)
+            }
             array.put(item)
         }
         return JSONObject().apply {

@@ -1,5 +1,27 @@
 package com.example.multipromptchat.ui.settings
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import com.example.multipromptchat.data.remote.ModelInfo
+import com.example.multipromptchat.ui.components.PromptTag
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
+import com.example.multipromptchat.data.image.ImageStore
+import com.example.multipromptchat.data.repository.DEFAULT_ACCENT_ARGB
+import com.example.multipromptchat.ui.theme.accentHueOf
+import com.example.multipromptchat.ui.theme.hueToAccentArgb
+import com.example.multipromptchat.ui.theme.isDefaultAccent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -20,6 +42,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
@@ -46,6 +69,7 @@ import com.example.multipromptchat.data.repository.CONTEXT_MESSAGES_MAX
 import com.example.multipromptchat.data.repository.CONTEXT_MESSAGES_MIN
 import com.example.multipromptchat.data.repository.ThemeMode
 import com.example.multipromptchat.ui.Strings
+import com.example.multipromptchat.ui.theme.screenBackgroundColor
 import com.example.multipromptchat.ui.components.ApiKeyMissingCard
 import com.example.multipromptchat.ui.components.HarmonyCard
 import com.example.multipromptchat.ui.components.PageTitle
@@ -65,10 +89,42 @@ fun SettingsScreen(
     var showClearConfirm by remember { mutableStateOf(false) }
     val apiGuideCollapsed by container.settingsRepository.apiGuideCollapsed.collectAsState()
 
+    // ---- 1.2：背景图选择 + 主色调滑杆 ------------------------------------
+    var wallpaperBusy by remember { mutableStateOf(false) }
+    var accentHue by remember { mutableStateOf(accentHueOf(container.settingsRepository.appearance.value.accentArgb)) }
+    val scope = rememberCoroutineScope()
+    val appContext = LocalContext.current
+    LaunchedEffect(state.appearance.accentArgb) {
+        accentHue = accentHueOf(state.appearance.accentArgb)
+    }
+    val backgroundPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        if (uri != null) {
+            wallpaperBusy = true
+            scope.launch {
+                val result = ImageStore.import(
+                    context = appContext,
+                    uri = uri,
+                    dirName = ImageStore.DIR_WALLPAPER,
+                    maxEdge = 1600,
+                )
+                wallpaperBusy = false
+                when (result) {
+                    is ImageStore.Result.Success -> {
+                        ImageStore.deleteQuietly(viewModel.uiState.value.appearance.backgroundPath)
+                        viewModel.setBackgroundPath(result.file.absolutePath)
+                    }
+                    is ImageStore.Result.Error -> viewModel.reportImageError(result.failure)
+                }
+            }
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(screenBackgroundColor())
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .navigationBarsPadding(),
@@ -188,6 +244,77 @@ fun SettingsScreen(
                         text = test.message,
                         color = MaterialTheme.colorScheme.error,
                     )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = Strings.modelSectionTitle,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = state.modelName,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = Strings.modelHint,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            PillButton(
+                text = Strings.modelFetch,
+                onClick = viewModel::fetchModels,
+                variant = PillVariant.Outline,
+                enabled = state.hasKey && state.modelState != ModelFetchState.Loading,
+            )
+
+            when (val modelState = state.modelState) {
+                ModelFetchState.Idle -> Unit
+                ModelFetchState.Loading -> {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    TestStatusRow(
+                        text = Strings.modelFetching,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        showSpinner = true,
+                    )
+                }
+                is ModelFetchState.Loaded -> {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    TestStatusRow(
+                        text = Strings.modelFetched(modelState.count),
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
+                }
+                is ModelFetchState.Failed -> {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    TestStatusRow(
+                        text = modelState.message,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+
+            if (state.models.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 240.dp)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    state.models.forEach { model ->
+                        ModelRow(
+                            model = model,
+                            selected = model.id == state.modelName,
+                            onClick = { viewModel.selectModel(model.id) },
+                        )
+                    }
                 }
             }
 
@@ -343,6 +470,154 @@ fun SettingsScreen(
                 checked = experience.showTokenUsage,
                 onCheckedChange = viewModel::setShowTokenUsage,
             )
+        }
+
+        // ---- 1.2：外观（背景图 + 主色调）------------------------------------
+        SectionHeader(
+            title = Strings.themeSection,
+            subtitle = Strings.appearanceAccentDesc,
+            modifier = Modifier
+                .padding(horizontal = 20.dp)
+                .padding(top = 20.dp, bottom = 8.dp),
+        )
+
+        HarmonyCard(modifier = Modifier.padding(horizontal = 20.dp)) {
+            Text(
+                text = Strings.appearanceBackgroundTitle,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = Strings.appearanceBackgroundDesc,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+
+            val backgroundPreview = remember(state.appearance.backgroundPath) {
+                state.appearance.backgroundPath?.let { path ->
+                    runCatching { android.graphics.BitmapFactory.decodeFile(path) }.getOrNull()
+                }
+            }
+            if (backgroundPreview != null) {
+                androidx.compose.foundation.Image(
+                    bitmap = backgroundPreview.asImageBitmap(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(96.dp)
+                        .clip(MaterialTheme.shapes.medium),
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            } else {
+                Text(
+                    text = Strings.appearanceBackgroundEmpty,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                PillButton(
+                    text = if (wallpaperBusy) {
+                        Strings.appearanceBackgroundBusy
+                    } else {
+                        Strings.appearanceBackgroundPick
+                    },
+                    onClick = {
+                        backgroundPicker.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    },
+                    enabled = !wallpaperBusy,
+                )
+                if (state.appearance.hasBackground) {
+                    Spacer(modifier = Modifier.width(10.dp))
+                    PillButton(
+                        text = Strings.appearanceBackgroundRemove,
+                        variant = PillVariant.Outline,
+                        onClick = {
+                            ImageStore.deleteQuietly(state.appearance.backgroundPath)
+                            viewModel.setBackgroundPath(null)
+                        },
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = Strings.imageLimitsHint,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        HarmonyCard(modifier = Modifier.padding(horizontal = 20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = Strings.appearanceAccentTitle,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                )
+                Surface(
+                    shape = CircleShape,
+                    color = Color(state.appearance.accentArgb.toInt()),
+                    modifier = Modifier.size(22.dp),
+                ) {}
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                ACCENT_PRESETS.forEach { argb ->
+                    val selected = state.appearance.accentArgb == argb
+                    Surface(
+                        shape = CircleShape,
+                        color = Color(argb.toInt()),
+                        border = if (selected) {
+                            BorderStroke(2.dp, MaterialTheme.colorScheme.onSurface)
+                        } else {
+                            null
+                        },
+                        modifier = Modifier
+                            .size(30.dp)
+                            .clip(CircleShape)
+                            .clickable { viewModel.setAccentColor(argb) },
+                    ) {}
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            Slider(
+                value = accentHue,
+                onValueChange = { hue ->
+                    accentHue = hue
+                    viewModel.setAccentColor(hueToAccentArgb(hue))
+                },
+                valueRange = 0f..360f,
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = if (isDefaultAccent(state.appearance.accentArgb)) {
+                        Strings.appearanceAccentDefault
+                    } else {
+                        "#%06X".format(state.appearance.accentArgb and 0xFFFFFFL)
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                TextButton(onClick = { viewModel.setAccentColor(DEFAULT_ACCENT_ARGB) }) {
+                    Text(
+                        text = Strings.appearanceAccentReset,
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
+            }
         }
 
         // ---- About --------------------------------------------------------
@@ -504,5 +779,57 @@ private fun TestStatusRow(
             style = MaterialTheme.typography.bodySmall,
             color = color,
         )
+    }
+}
+
+/** 1.2：预设主色调（低饱和）。第一项是默认色。 */
+private val ACCENT_PRESETS: List<Long> = listOf(
+    0xFF3A7AFEL,
+    0xFF2F9C95L,
+    0xFF7C5CFFL,
+    0xFFE4739AL,
+    0xFFE2823FL,
+    0xFF4CA65CL,
+    0xFF4A5BC4L,
+    0xFF6B7280L,
+)
+
+/** 1.2：可选的模型行（点选即生效） */
+@Composable
+private fun ModelRow(
+    model: ModelInfo,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.small)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = model.id,
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (selected) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
+            modifier = Modifier.weight(1f),
+        )
+        if (model.looksVisionCapable) {
+            PromptTag(text = Strings.modelVisionTag)
+            Spacer(modifier = Modifier.width(6.dp))
+        }
+        if (selected) {
+            Icon(
+                imageVector = Icons.Filled.Check,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp),
+            )
+        }
     }
 }

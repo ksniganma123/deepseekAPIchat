@@ -31,3 +31,10 @@ val DarkTextSecondary = Color(0xFF98A1AE)
 val DarkOutline = Color(0xFF2C333C)
 val DarkError = Color(0xFFFF8A80)
 val DarkErrorSoft = Color(0xFF3A1F1D)
+
+// ---- 代码块语法高亮（1.2）-----------------------------------------------
+// 不随主色派生：代码配色需要稳定的语义色，否则换主题后关键字和字符串分不清。
+val CodeKeyword = Color(0xFF3A7AFE)
+val CodeString = Color(0xFF2F9C95)
+val CodeNumber = Color(0xFF9A6A00)
+val CodeComment = Color(0xFF7A869A)

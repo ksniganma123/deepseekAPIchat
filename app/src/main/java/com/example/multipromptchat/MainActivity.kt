@@ -21,12 +21,17 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val themeMode by container.settingsRepository.themeMode.collectAsState()
+            val appearance by container.settingsRepository.appearance.collectAsState()
             val darkTheme = when (themeMode) {
                 ThemeMode.LIGHT -> false
                 ThemeMode.DARK -> true
                 ThemeMode.SYSTEM -> isSystemInDarkTheme()
             }
-            MultipromptChatTheme(darkTheme = darkTheme) {
+            // 1.2：主色调改动后整棵树即时重组，无需重启。
+            MultipromptChatTheme(
+                darkTheme = darkTheme,
+                accentSeed = appearance.accentArgb,
+            ) {
                 AppNavHost(container = container)
             }
         }

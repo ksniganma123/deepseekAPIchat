@@ -1,67 +1,34 @@
 package com.example.multipromptchat.ui.theme
 
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-
-private val LightColors = lightColorScheme(
-    primary = LightAccent,
-    onPrimary = LightSurface,
-    primaryContainer = LightAccentSoft,
-    onPrimaryContainer = LightAccentDeep,
-    secondary = LightSecondary,
-    onSecondary = LightSurface,
-    secondaryContainer = LightSecondarySoft,
-    onSecondaryContainer = LightSecondary,
-    background = LightBackground,
-    onBackground = LightTextPrimary,
-    surface = LightSurface,
-    onSurface = LightTextPrimary,
-    surfaceVariant = LightSurfaceAlt,
-    onSurfaceVariant = LightTextSecondary,
-    outline = LightOutline,
-    outlineVariant = LightOutline,
-    error = LightError,
-    onError = LightSurface,
-    errorContainer = LightErrorSoft,
-    onErrorContainer = LightError,
-)
-
-private val DarkColors = darkColorScheme(
-    primary = DarkAccent,
-    onPrimary = DarkBackground,
-    primaryContainer = DarkAccentSoft,
-    onPrimaryContainer = DarkAccentDeep,
-    secondary = DarkSecondary,
-    onSecondary = DarkBackground,
-    secondaryContainer = DarkSecondarySoft,
-    onSecondaryContainer = DarkSecondary,
-    background = DarkBackground,
-    onBackground = DarkTextPrimary,
-    surface = DarkSurface,
-    onSurface = DarkTextPrimary,
-    surfaceVariant = DarkSurfaceAlt,
-    onSurfaceVariant = DarkTextSecondary,
-    outline = DarkOutline,
-    outlineVariant = DarkOutline,
-    error = DarkError,
-    onError = DarkBackground,
-    errorContainer = DarkErrorSoft,
-    onErrorContainer = DarkError,
-)
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Color
+import com.example.multipromptchat.data.repository.DEFAULT_ACCENT_ARGB
 
 /**
- * Single source of truth for colours. Nothing outside this file hard-codes a colour,
- * so light/dark (and a future brand re-skin) only touch this file.
+ * 单一主题入口。
+ *
+ * - 颜色只有一个来源：本文件 + [DynamicColor]；页面里不写死色值。
+ * - 1.2 起支持自定义主色调：[accentSeed] 为 ARGB，等于默认值时沿用 1.1 手工调好的配色，
+ *   否则从种子色派生一组低饱和强调色。
  */
 @Composable
 fun MultipromptChatTheme(
     darkTheme: Boolean = false,
+    accentSeed: Long = DEFAULT_ACCENT_ARGB,
     content: @Composable () -> Unit,
 ) {
+    val scheme = if (accentSeed == DEFAULT_ACCENT_ARGB) {
+        if (darkTheme) darkScheme(DefaultDarkTones) else lightScheme(DefaultLightTones)
+    } else {
+        val seedColor = Color(accentSeed.toInt())
+        val tones = remember(accentSeed, darkTheme) { deriveAccentTones(seedColor, darkTheme) }
+        if (darkTheme) darkScheme(tones) else lightScheme(tones)
+    }
+
     MaterialTheme(
-        colorScheme = if (darkTheme) DarkColors else LightColors,
+        colorScheme = scheme,
         typography = HarmonyTypography,
         shapes = HarmonyShapes,
         content = content,
