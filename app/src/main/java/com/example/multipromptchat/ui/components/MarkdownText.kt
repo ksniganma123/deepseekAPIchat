@@ -97,15 +97,20 @@ fun MarkdownText(
 
 @Composable
 private fun MdHeading(block: MdBlock.Heading) {
+    // 6 级标题各给一档字号，深层级靠字号与上间距收敛，不靠编号
     val style = when (block.level) {
         1 -> MaterialTheme.typography.titleLarge
         2 -> MaterialTheme.typography.titleMedium
-        else -> MaterialTheme.typography.titleSmall
+        3 -> MaterialTheme.typography.titleSmall
+        4 -> MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
+        5 -> MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+        else -> MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold)
     }
     Text(
         text = inlineAnnotated(block.text, MaterialTheme.colorScheme),
         style = style,
         color = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.padding(top = if (block.level <= 2) 2.dp else 4.dp),
     )
 }
 
@@ -121,16 +126,21 @@ private fun MdParagraph(text: String) {
 @Composable
 private fun MdList(block: MdBlock.ListBlock) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        block.items.forEachIndexed { index, item ->
-            Row(modifier = Modifier.fillMaxWidth()) {
+        block.items.forEach { item ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = (item.level * 16).dp),
+                verticalAlignment = Alignment.Top,
+            ) {
                 Text(
-                    text = if (block.ordered) "${index + 1}." else "•",
+                    text = item.marker,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.width(if (block.ordered) 24.dp else 14.dp),
+                    modifier = Modifier.width(if (item.ordered) 26.dp else 16.dp),
                 )
                 Text(
-                    text = inlineAnnotated(item, MaterialTheme.colorScheme),
+                    text = inlineAnnotated(item.text, MaterialTheme.colorScheme),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f),

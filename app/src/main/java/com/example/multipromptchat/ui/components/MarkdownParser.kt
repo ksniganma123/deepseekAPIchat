@@ -1,10 +1,18 @@
 package com.example.multipromptchat.ui.components
 
 /** Markdown 块级元素（只覆盖聊天里会出现的那些）。 */
+/** 列表项：带真实层级与算好的序号（嵌套时由解析器按层计数） */
+data class MdListItem(
+    val text: String,
+    val level: Int,
+    val marker: String,
+    val ordered: Boolean,
+)
+
 sealed interface MdBlock {
     data class Heading(val level: Int, val text: String) : MdBlock
     data class Paragraph(val text: String) : MdBlock
-    data class ListBlock(val ordered: Boolean, val items: List<String>) : MdBlock
+    data class ListBlock(val items: List<MdListItem>) : MdBlock
     data class Quote(val text: String) : MdBlock
     data class Code(val language: String, val code: String) : MdBlock
     data class Table(val header: List<String>, val rows: List<List<String>>) : MdBlock
@@ -19,9 +27,10 @@ sealed interface MdBlock {
 object MarkdownParser {
 
     private val HEADING = Regex("^(#{1,6})\\s+(.*)$")
-    private val BULLET = Regex("^\\s*[-*+]\\s+(.*)$")
-    private val ORDERED = Regex("^\\s*\\d+[.)]\\s+(.*)$")
+    private val LIST_ITEM = Regex("^(\\s*)([-*+]|\\d+[.)])\\s+(.*)$")
     private val DIVIDER = Regex("^\\s*(-{3,}|\\*{3,}|_{3,})\\s*$")
+    private const val MAX_LIST_LEVEL = 6
+
     private val TABLE_SEPARATOR = Regex("^\\s*\\|?\\s*:?-{2,}:?\\s*(\\|\\s*:?-{2,}:?\\s*)*\\|?\\s*$")
 
     fun parse(source: String): List<MdBlock> {
@@ -117,27 +126,45 @@ object MarkdownParser {
                 continue
             }
 
-            // 无序列表
-            if (BULLET.matches(line)) {
+            // 列表（有序 / 无序 / 嵌套 / 松散列表统一处理）
+            if (LIST_ITEM.containsMatchIn(line)) {
                 flushParagraph()
-                val items = mutableListOf<String>()
-                while (index < lines.size && BULLET.matches(lines[index])) {
-                    items.add(BULLET.find(lines[index])!!.groupValues[1].trim())
-                    index++
-                }
-                blocks.add(MdBlock.ListBlock(ordered = false, items = items))
-                continue
-            }
+                val items = mutableListOf<MdListItem>()
+                // 每个层级一个计数器：回到浅层时把更深的计数清零，保证「按层递增」
+                val counters = mutableListOf<Int>()
+                var cursor = index
+                while (cursor < lines.size) {
+                    val match = LIST_ITEM.find(lines[cursor])
+                    if (match == null) {
+                        // 松散列表：允许单个空行后继续同一列表（这就是「全是 1.」的元凶）
+                        val next = cursor + 1
+                        if (lines[cursor].isBlank() && next < lines.size && LIST_ITEM.containsMatchIn(lines[next])) {
+                            cursor++
+                            continue
+                        }
+                        break
+                    }
+                    val indentText = match.groupValues[1].replace("\t", "    ")
+                    val level = (indentText.length / 2).coerceIn(0, MAX_LIST_LEVEL)
+                    val marker = match.groupValues[2]
+                    val ordered = marker.firstOrNull()?.isDigit() == true
+                    val text = match.groupValues[3].trim()
 
-            // 有序列表
-            if (ORDERED.matches(line)) {
-                flushParagraph()
-                val items = mutableListOf<String>()
-                while (index < lines.size && ORDERED.matches(lines[index])) {
-                    items.add(ORDERED.find(lines[index])!!.groupValues[1].trim())
-                    index++
+                    while (counters.size <= level) counters.add(0)
+                    for (deeper in level + 1 until counters.size) counters[deeper] = 0
+
+                    val displayMarker = if (ordered) {
+                        counters[level] += 1
+                        "${counters[level]}."
+                    } else {
+                        counters[level] = 0
+                        if (level == 0) "•" else "◦"
+                    }
+                    items.add(MdListItem(text = text, level = level, marker = displayMarker, ordered = ordered))
+                    cursor++
                 }
-                blocks.add(MdBlock.ListBlock(ordered = true, items = items))
+                blocks.add(MdBlock.ListBlock(items = items))
+                index = cursor
                 continue
             }
 
