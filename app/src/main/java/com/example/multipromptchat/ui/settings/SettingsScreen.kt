@@ -333,31 +333,6 @@ fun SettingsScreen(
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
         )
 
-        // ---- Appearance ---------------------------------------------------
-        SectionHeader(
-            title = Strings.themeSection,
-            modifier = Modifier.padding(horizontal = 20.dp).padding(top = 20.dp, bottom = 8.dp),
-        )
-        HarmonyCard(modifier = Modifier.padding(horizontal = 20.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ChoiceChip(
-                    label = Strings.themeSystem,
-                    selected = state.themeMode == ThemeMode.SYSTEM,
-                    onClick = { viewModel.setThemeMode(ThemeMode.SYSTEM) },
-                )
-                ChoiceChip(
-                    label = Strings.themeLight,
-                    selected = state.themeMode == ThemeMode.LIGHT,
-                    onClick = { viewModel.setThemeMode(ThemeMode.LIGHT) },
-                )
-                ChoiceChip(
-                    label = Strings.themeDark,
-                    selected = state.themeMode == ThemeMode.DARK,
-                    onClick = { viewModel.setThemeMode(ThemeMode.DARK) },
-                )
-            }
-        }
-
         // ---- 增量 C：聊天体验 -----------------------------------------------
         SectionHeader(
             title = Strings.chatExperienceSection,
@@ -472,15 +447,51 @@ fun SettingsScreen(
             )
         }
 
-        // ---- 1.2：外观（背景图 + 主色调）------------------------------------
+        // ---- 外观（深浅色 + 背景图 + 主色调，统一一组）----------------------
         SectionHeader(
             title = Strings.themeSection,
-            subtitle = Strings.appearanceAccentDesc,
+            subtitle = Strings.appearanceSectionDesc,
             modifier = Modifier
                 .padding(horizontal = 20.dp)
                 .padding(top = 20.dp, bottom = 8.dp),
         )
 
+        // 1) 深浅色模式
+        HarmonyCard(modifier = Modifier.padding(horizontal = 20.dp)) {
+            Text(
+                text = Strings.themeModeTitle,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = Strings.themeModeDesc,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ChoiceChip(
+                    label = Strings.themeSystem,
+                    selected = state.themeMode == ThemeMode.SYSTEM,
+                    onClick = { viewModel.setThemeMode(ThemeMode.SYSTEM) },
+                )
+                ChoiceChip(
+                    label = Strings.themeLight,
+                    selected = state.themeMode == ThemeMode.LIGHT,
+                    onClick = { viewModel.setThemeMode(ThemeMode.LIGHT) },
+                )
+                ChoiceChip(
+                    label = Strings.themeDark,
+                    selected = state.themeMode == ThemeMode.DARK,
+                    onClick = { viewModel.setThemeMode(ThemeMode.DARK) },
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // 2) 背景图
         HarmonyCard(modifier = Modifier.padding(horizontal = 20.dp)) {
             Text(
                 text = Strings.appearanceBackgroundTitle,
@@ -556,6 +567,7 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
+        // 3) 主色调
         HarmonyCard(modifier = Modifier.padding(horizontal = 20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -570,6 +582,12 @@ fun SettingsScreen(
                     modifier = Modifier.size(22.dp),
                 ) {}
             }
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = Strings.appearanceAccentDesc,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             Spacer(modifier = Modifier.height(10.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

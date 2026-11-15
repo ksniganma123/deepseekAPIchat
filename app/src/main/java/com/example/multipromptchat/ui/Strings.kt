@@ -220,6 +220,9 @@ object Strings {
     const val modelNeedKey = "先保存密钥，再获取模型列表"
     const val modelVisionTag = "可识图"
 
+    const val appearanceSectionDesc = "深浅色、背景图与主色调，改完立即生效"
+    const val themeModeTitle = "深浅色模式"
+    const val themeModeDesc = "「跟随系统」会随系统深色设置自动切换"
     const val appearanceBackgroundTitle = "聊天背景图"
     const val appearanceBackgroundDesc = "选一张本地图片铺在界面最底层，卡片与文字会自动加蒙层保证可读"
     const val appearanceBackgroundPick = "选择图片"
