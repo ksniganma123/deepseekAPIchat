@@ -4,20 +4,24 @@
 
 > ⚠️ 本项目由 **AI 辅助编码（AI Coding）** 完成，功能稳定性不作保证；与 DeepSeek 开放平台及深度求索公司无任何隶属关系。详见 [声明](#声明)。
 
-技术栈：Kotlin · Jetpack Compose + Material 3 · Room · OkHttp + okhttp-sse · EncryptedSharedPreferences。单模块 `app`，包名 `com.example.multipromptchat`（可改，见 [改包名](#改包名)）。
+技术栈：Kotlin · Jetpack Compose + Material 3 · Room · OkHttp + okhttp-sse · EncryptedSharedPreferences。单模块 `app`，包名 `com.example.multipromptchat`。
+
+**本文是使用手册**：按「你想做什么 → 怎么做 → 预期结果 → 注意什么」组织。需要改代码、看接口或自己编译，请直接跳到 [给开发者](#给开发者)。
+
+如果你用的是更早的构建（1.0）：图片对话、模型选择、Markdown 富文本、外观自定义这四项当时还没有，其余用法一致。
 
 ---
 
-## 项目简介
+## 这个 App 能做什么
 
-市面上的聊天客户端大多只有「一个全局人设」。如果你习惯同时用几种角色——写代码时要严谨的工程师、改简历时要挑剔的顾问、翻译时要零废话的译者——那就要么反复改全局提示词，要么开一堆 App。
+大多数聊天客户端只有「一个全局人设」。如果你同时用几种角色——写代码时要严谨的工程师、改简历时要挑剔的顾问、翻译时要零废话的译者——那就得反复改全局提示词，或者开一堆 App。
 
-deepseekAPIchat 把这件事拆成两层：
+这个 App 把这件事拆成两层：
 
-- **人设（Prompt 模板）** 是可复用的资产，能建、能改、能批量删；
-- **会话** 绑定一个人设，并在切换时把「保留历史 / 清空历史」交给你决定。
+- **人设（Prompt 模板）** 是可复用的资产：能建、能改、能批量删；
+- **会话** 绑定一个人设，切换时把「保留历史 / 清空历史」交给你决定。
 
-于是切换角色只需要在聊天页点一下人设胶囊，而不是重开一个会话或改全局配置。
+所以换角色只需要在聊天页点一下人设胶囊，不必重开会话、也不必改全局配置。除此之外：聊天支持流式输出与图片输入，回复按 Markdown 排版（代码块带高亮与复制），界面可以换背景图和主色调。
 
 界面按 HarmonyOS 风格做成大圆角、柔和阴影、低饱和强调色与充足留白；**不使用华为商标、专有字体或专有图标**，图标全部来自 `androidx.compose.material:material-icons-core`。
 
@@ -28,243 +32,260 @@ deepseekAPIchat 把这件事拆成两层：
 
 ---
 
-## 亮点特性
+## 快速开始
 
-### 人设：会话级而不是全局级
+五分钟走完，每步都写了预期结果。
 
-- **每个会话绑定一个人设**，还有一份 `promptSnapshot`（绑定当时的人设内容），所以模板后来被改被删，历史会话的行为依然可解释。
-- **会话内随时切换**：底部弹窗选人设，切完只影响后续请求的 system 指令。
-- **切换时问你一句**：若该模板开了「切换时重置上下文」，会弹「保留历史 / 清空历史」；关掉则静默保留。
-- **人设批量管理**：列表页「批量选择」→ 勾选 / 全选 → 一次删除，带二次确认；被会话占用的人设会被跳过，不会误删。
+**1. 安装**
 
-### 聊天
+- 用现成包：仓库的 Release 附件或 `dist/deepseekAPIchat-1.2.apk`（约 8.7 MB，`versionName 1.2` / `versionCode 2`）。拷进手机点击安装，需允许「未知来源」。
+- 自己编译：见 [构建环境与命令](#构建环境与命令)。
 
-- **流式输出**逐字上屏，带闪烁光标；也可在设置里关掉，改成一次性返回完整回复。
-- **随时叫停**：发送中按钮变「停止」，取消即中断 HTTP 连接，已收到的部分仍会存库。
-- **失败有话说**：401 / 402 / 403 / 429 / 5xx、连接超时、DNS 失败都翻译成中文提示。
-- **自动起标题**：首条消息后用一个极短请求生成 ≤10 字标题；失败就保留「新会话」，不打扰。
-- **上下文节流**：只发送最近 N 条历史（5~50 可调），system 指令始终保留。
-- **用量可见**：可选在输入框下方显示本会话累计 token 与缓存命中率。
+**预期**：桌面出现「deepseekAPIchat」图标。
 
-### Markdown 富文本
+**2. 首次打开**
 
-- 助手回复按 Markdown 渲染：标题、粗体/斜体/删除线、行内代码、有序/无序列表、引用、分割线、表格。
-- **代码块**：等宽字体 + 基础语法高亮（注释/字符串/数字/关键字）+ 横向滚动 + 右上角「复制」。
-- **流式输出期间刻意降级为纯文本**：半截 Markdown（``` 未闭合、表格没对齐）解析会乱，所以只在回复结束后做一次完整渲染。
-- 用户自己输入的消息按纯文本显示，不会被当成 Markdown 解释。
-
-### 隐私与本地化
-
-- 会话、消息、人设全部存在本机 Room 数据库，**没有云同步、没有账号体系**。
-- API Key 走 `EncryptedSharedPreferences`（Android Keystore 的 AES-256 主密钥），界面只显示脱敏形式（形如 `sk-ab••••••wxyz`）。
-- `android:allowBackup="false"`，Key 不会被系统云备份带走；源码与日志里都不会出现明文 Key。
-
-### 外观自定义（1.2）
-
-- **自定义背景图**：选一张本地图片铺在界面最底层，卡片与文字自动叠加半透明蒙层保证可读；解码失败或文件被删时自动回落到纯色背景。
-- **自定义主色调**：8 个预设色 + 色相滑杆，点一下按钮颜色立刻变，不用重启；自定义色会被收在低饱和区间，保持和内置配色一致的观感。
-- **默认值兜底**：没有配置时就是内置蓝（#3A7AFE）+ 纯色背景。
-
-### 图片对话（1.2）
-
-- 输入框左侧点 ⨁ 选图，发出前能预览、能移除；也可以只发图不写字。
-- 格式 JPEG / PNG / WebP，原图 ≤ 8 MB，自动压缩到最长边 1280 / ≤ 1 MB 后才发送与落库。
-- 配合设置页「获取可用模型」选中的识图模型使用（如 `deepseek-flash`）。
-- 图片转成 OpenAI 兼容的 `image_url` 消息体随请求发出；历史消息里的图会作为上下文一并重发。
-- 超限、格式不支持、读取或解码失败都有中文提示，不会静默丢图。
-
-### 上手成本
-
-- **首次启动全屏三步引导**：欢迎与核心亮点 → 看截图去开放平台拿密钥 → 当场粘贴、保存、测试连接。可「稍后再说」跳过。
-- **测试连接**一键探活，直接告诉你「密钥无效」「余额不足」「网络不通」还是「服务暂时不可用」。
-- 三 Tab 底部导航：会话 / Prompt / 设置；空态、错态、加载态齐备；支持深色模式（跟随系统 / 浅色 / 深色）。
-
----
-
-## 安装与前置要求
-
-### 前置要求
-
-| 项目 | 要求 |
-| --- | --- |
-| 手机 | Android 8.0（API 26）及以上，详见 [系统要求](#系统要求) |
-| DeepSeek 账号 | 需要可用的 API Key，且账户有少量余额（按量计费） |
-| 安装方式 A | 直接把 APK 拷进手机安装（需允许「未知来源」） |
-| 安装方式 B | 电脑 + `adb`：`adb install -r app-debug.apk` |
-
-### 方式 A：用现成的 APK
-
-仓库 `dist/` 下有一份 release 签名包：
-
-```
-dist/deepseekAPIchat-1.2.apk       # 约 8.7 MB，versionName 1.2（versionCode 2）
-```
-
-拷到手机 → 点击安装 → 桌面出现「deepseekAPIchat」图标。
-
-### 方式 B：自己构建
-
-```bash
-git clone <your-repo-url> deepseekAPIchat
-cd deepseekAPIchat
-
-# Windows
-.\gradlew.bat assembleDebug
-# macOS / Linux
-./gradlew assembleDebug
-```
-
-**预期结果**：`app/build/outputs/apk/debug/app-debug.apk` 生成，末尾打印 `BUILD SUCCESSFUL`。
-
-安装到已连接设备：
-
-```bash
-adb install -r app/build/outputs/apk/debug/app-debug.apk
-```
-
-构建环境（JDK / SDK / Gradle 版本）见 [系统要求](#系统要求)。Gradle Wrapper 已随仓库提供，首次构建需要联网下载依赖。
-
----
-
-## 快速上手
-
-按顺序做完这 7 步即可开始聊天，每步都写了预期结果。
-
-**1. 首次打开 App**
-
-预期：出现全屏引导第一步，标题「欢迎使用 deepseekAPIchat」，能看到「多个人设，随时切换」「人设攒多了，还能批量管」两张卡。
-
-**2. 点亮「开始配置」**
-
-预期：进入第二步「三步拿到密钥」，里面有三张平台截图：登录后在左侧点 `API keys` → 点「创建 API key」并起名 → 创建成功后点「复制」。
+**预期**：出现全屏引导第一步，标题「欢迎使用 deepseekAPIchat」，能看到「多个人设，随时切换」「人设攒多了，还能批量管」两张卡。点「开始配置」进入第二步。
 
 **3. 拿一把密钥**
 
-点「打开平台」按钮（或手动访问 `https://platform.deepseek.com/api_keys`），登录后创建 Key 并复制那串 `sk-` 开头的字符。
-预期：浏览器打开开放平台；复制成功的 Key 类似 `sk-xxxxxxxx...`。
+点「打开平台」（或手动访问 `https://platform.deepseek.com/api_keys`），登录 → 创建 API Key → 复制 `sk-` 开头那串。
 
-**4. 粘贴、保存、测试**
+**预期**：浏览器打开开放平台；引导第二步里有三张截图分别对应「进 API keys 页面 → 创建 → 复制」。
 
-回到 App 的引导第三步，粘贴 Key → 点「保存」→ 点「测试连接」。
-预期：出现「连接正常，可以开始聊天了」。若提示「密钥无效，请检查是否复制完整」，重新复制一次。
+**4. 粘贴并验证**
 
-**5. 完成引导**
+回到引导第三步粘贴 Key → 「保存」→ 「测试连接」。
 
-点「完成，开始聊天」。
-预期：进入「会话」页，显示空态「还没有会话」。
+**预期**：出现「连接正常，可以开始聊天了」。若提示「密钥无效，请检查是否复制完整」，重新复制一次即可。
 
-**6. 新建会话并选人设**
+**5. 新建会话并选人设**
 
-点右上角「新建」→ 在弹窗里**必须**选一个人设 → 点「创建」。
-预期：直接进入聊天页，顶部有个蓝色人设胶囊标签（首次启动预置了 3 个人设：通用助手 / 代码搭档 / 翻译润色）。
+「完成，开始聊天」进入会话页 → 右上角「新建」→ **必须**选一个人设 → 「创建」。
 
-**7. 发第一条消息**
+**预期**：直接进入聊天页，顶部有蓝色人设胶囊。首次启动预置了 3 个人设：通用助手 / 代码搭档 / 翻译润色。
 
-输入问题 → 点发送（或按回车）。
-预期：回答逐字出现；发完后会话标题会被自动改成一个不超过 10 字的短标题，返回列表即可看到。
+**6. 发第一条消息**
+
+输入问题 → 发送（或回车）。
+
+**预期**：回答逐字出现；发完后会话标题会自动换成 ≤10 字的短标题，返回列表即可看到。
 
 ---
 
-## 常用用法与配置说明
+## 功能使用手册
 
-### 人设（Prompt 模板）怎么用
+### 人设（Prompt 模板）
 
-「Prompt」Tab 里可以新建、编辑、删除人设。每个模板包含：
+**解决什么**：把「角色」从一次性提示词变成可复用资产，多个会话可以共用同一套设定。
 
-| 字段 | 说明 | 界面文案 |
-| --- | --- | --- |
-| `name` | 模板名，会显示在会话列表的人设胶囊上 | 名称 |
-| `systemPrompt` | 角色的 system 指令 | 角色设定 |
-| `temperature` | 采样温度，0~2 | 回答风格 |
-| `topP` | 核采样，0~1 | 多样性 |
-| `resetContextOnSwitch` | 切到该模板时是否询问清空历史 | 切换会话时重置上下文 |
+**在哪用**：「Prompt」Tab。
 
-编辑页顶部有一张可折叠的「角色设定写法指引」，含 4 条要点和两组 ❌/✅ 对比；点 ✅ 卡片的「用这个示例」可一键填入（已有内容时会先确认）。
+**怎么用**
 
-### 在会话里换人设
+- 新建/编辑：填名称、角色设定（system 指令），再调两个可选项——「回答风格」（temperature，0~2，越高越发散）与「多样性」（top_p，0~1）。
+- 写设定没头绪：编辑页顶部有可折叠的「角色设定写法指引」，含 4 条要点和两组 ❌/✅ 对比，点 ✅ 卡片的「用这个示例」可一键填入（输入框已有内容时会先确认）。
+- 勾选「切换会话时重置上下文」：会话里切到该人设时，会问你要不要清空历史。
+- **批量删除**：列表页右上「批量选择」→ 勾选或「全选」→ 顶部显示「已选 N 项」→「删除选中」→ 二次确认。没选中任何条目时按钮是禁用的；点「完成」可退出选择模式。
 
-1. 聊天页顶部的蓝色人设胶囊 → 点一下。
-2. 底部弹窗选另一个模板（当前项带 ✓）。
-3. 如果新模板开了 `resetContextOnSwitch`，会问「要清空历史吗？」：
-   - **清空历史**：消息全部删除，从这个角色重新开始；
-   - **保留历史**：消息留着，只有后续请求的 system 指令换成新角色。
+**注意**
 
-预期结果：顶部的胶囊标签立刻变成新人设；如果选了清空，消息列表清空。
+- 人设被会话引用时**不能删**，会提示「被 N 个会话引用」——这是保护，避免历史会话丢失设定。
+- 会话会记一份绑定当时的人设快照，所以模板后来被改被删，旧会话的行为仍然可解释。
 
-### 批量删除人设
+### 会话
 
-1. 「Prompt」Tab → 右上角「批量选择」。
-2. 勾选条目（点整张卡或勾选框都行），或用「全选 / 取消全选」。
-3. 顶部会显示「已选 N 项」；没选中任何条目时「删除选中」是禁用的。
-4. 点「删除选中」→ 二次确认 → 确认。
-5. 点「完成」可随时退出选择模式。
+**怎么用**
 
-预期结果：删除成功的条目立即消失，计数同步更新；**仍被会话引用的人设会被跳过**，顶部提示会写明「已删除 X 个；Y 个被会话引用，已跳过」。
+- 新建：会话页右上「新建」→ 必选一个人设 → 可留空标题（发首条消息后自动生成 ≤10 字标题）。
+- 改/删：卡片右上角「⋮」→ 重命名 / 删除（删除会连带清掉该会话全部消息，有二次确认）。
+- 界面信息：卡片显示标题、最后一条消息预览、时间，以及绑定的人设胶囊标签。
 
-### 「聊天体验」设置（设置页 → 聊天体验）
+**注意**：自动标题受「聊天体验 → 自动生成会话标题」开关控制；关掉后标题保持「新会话」，也可手动重命名。
+
+### 聊天窗口
+
+**怎么用**
+
+- 发送：输入后点圆形发送键；输入中可按「停止」中断（已收到的部分仍会存下来）。
+- 切换人设：点顶部蓝色人设胶囊 → 底部弹窗选人设 → 若新人设开了「切换时重置上下文」，会问「清空历史 / 保留历史」。
+- 回复排版：助手回复按 Markdown 渲染——标题（6 级）、粗体/斜体/删除线、行内代码、有序与无序列表（支持嵌套缩进、按层级计号）、引用、分割线、表格。代码块带基础语法高亮、可横向滚动，右上角有「复制」。
+- 流式输出中显示的是**纯文本**：半截 Markdown（``` 未闭合、表格没对齐）解析出来会乱，所以只在回复结束后做一次完整排版。你自己输入的消息也按纯文本显示。
+
+**注意**
+
+- 同一会话同时只能有一个进行中的请求。
+- 失败会给出中文提示，不只是「出错了」：401 密钥无效、402 余额不足、403 无权限、429 太频繁、5xx 服务端错误、连接超时、DNS 失败。
+- Markdown 不是完整 CommonMark：脚注、内嵌 HTML、任务列表不渲染。
+
+### 发图片给 AI
+
+**解决什么**：让模型看着图回答（截图报错、看表格、读手写笔记等）。
+
+**怎么用**：输入框左侧 ⨁ → 系统图片选择器 → 选完在输入框上方出现缩略图与大小 → 可点 ✕ 移除 → 发送。也可以只发图不写字。
+
+**限制**
+
+| 项 | 规则 |
+| --- | --- |
+| 格式 | JPEG / PNG / WebP 明确支持；HEIC 等其它格式视系统能否解码，能则自动转 JPEG |
+| 原图大小 | ≤ 8 MB，超过直接提示并拒绝 |
+| 落地规格 | 自动压缩到最长边 1280、逐级降质直到 ≤ 1 MB 才发送与落库 |
+| 数量 | 每条消息 1 张 |
+| 前提 | 需要选**支持识图**的模型（如 `deepseek-flash`，见 [选择模型](#选择模型)） |
+
+**注意**
+
+- 图片存在 App 私有目录，消息只存路径；历史消息里的图会作为上下文一并重发，所以带图会话的 token 消耗会明显更高——可用「上下文消息条数」控制。
+- 异常都有中文提示，不会静默丢图：超限、格式不支持、读取失败、解码失败；若是服务端拒绝图片，会原样显示接口返回的错误。
+
+### 选择模型
+
+**怎么用**：设置页「连接码」分组底部 → 保存密钥后点「获取可用模型」→ 应用用当前密钥请求 `GET /models`，列出你这账号实际可用的模型 → 点任意一行即切换（当前项打勾高亮），选择会持久化，聊天与自动标题都用它。
+
+**注意**
+
+- id 含 `flash` / `vl` / `vision` 的模型会打「可识图」标签；做图片对话请选这类。
+- 若已保存的模型不在返回列表里，会自动选中第一项，避免用一个不存在的模型。
+- 拉取失败（密钥错、网络不通、账号无模型）会在按钮下方给出原因。
+
+### 外观
+
+**在哪用**：设置页「外观」分组，三项都**改完立即生效，无需重启**：
+
+1. **深浅色模式**：「跟随系统 / 浅色 / 深色」。跟随系统时会随系统深色设置自动切换。
+2. **聊天背景图**：点「选择图片」→ 系统图片选择器（不需要存储权限）→ 选完自动压缩并铺满整屏，卡片与文字自动叠半透明蒙层保证可读；「移除背景」回到纯色。原图 ≤ 8 MB，自动缩到最长边 1600。
+3. **主色调**：8 个预设色 + 色相滑杆，影响按钮、标签、选中态等强调色；「恢复默认」回到内置蓝（`#3A7AFE`）。自定义色会被收在低饱和区间（S 0.25~0.75），避免刺眼。
+
+**注意**
+
+- 背景图文件丢失或解码失败时**自动回落到纯色背景**，不会白屏。
+- 自定义主色只影响强调色（primary 系）；中性色与错误色仍按主题固定值。
+
+### 聊天体验设置
+
+设置页「聊天体验」分组，全部即时生效、只影响后续请求：
 
 | 设置 | 默认 | 作用 |
 | --- | --- | --- |
 | 发送快捷键 | 回车发送 | 回车发送模式：Enter 发送、Shift+Enter 换行；回车换行模式：Enter 换行、Ctrl+Enter 发送（Ctrl+Enter 需物理键盘或支持 Ctrl 的输入法） |
-| 自动生成会话标题 | 开 | 首条消息后用一次极短请求生成 ≤10 字标题；失败保留默认标题 |
-| 上下文消息条数 | 20（5~50） | 只把最近 N 条历史发给模型，system 指令始终保留，用来控 token |
-| 流式输出 | 开 | 关闭后走非流式请求，一次性显示完整回复 |
+| 自动生成会话标题 | 开 | 首条消息后用一次极短请求生成 ≤10 字标题；失败保留默认标题，不打扰 |
+| 上下文消息条数 | 20（5~50） | 只把最近 N 条历史发给模型，角色设定始终保留，用来控 token |
+| 流式输出 | 开 | 关闭后改走非流式请求，一次性显示完整回复 |
 | 显示 token 消耗与缓存命中率 | 关 | 开启后在输入框下方显示本会话累计 token 与缓存命中率 |
 
-所有设置**改完立即生效，只影响后续请求**，不会改动已有会话数据。
+### 数据与隐私
 
-### API 密钥管理
+- **密钥**：存在 `EncryptedSharedPreferences`（Android Keystore 的 AES-256 主密钥），界面只显示脱敏值（形如 `sk-ab••••••wxyz`）；源码、日志、git 里都不会出现明文。
+- **会话与消息**：存在本机 Room 数据库 `deepseekapichat.db`；没有账号体系、没有云同步。
+- `android:allowBackup="false"`：Key 不会被系统云备份带走，代价是卸载或换机后**数据不可恢复**。
+- 想清空某段对话：会话列表卡片「⋮」→ 删除会话（连带删除消息）。
 
-- 位置：设置页「连接码」分组。
-- 粘贴新 Key → 「保存」；随时可「测试连接」；「清除」需要二次确认。
-- 界面上只显示脱敏值，例如 `sk-ab••••••wxyz`；完整 Key 不会出现在日志或源码中。
+---
 
-### 选择模型（1.2）
+## 常见问题
 
-设置页「连接码」分组底部：
+**Q：为什么一定要先配密钥才能聊天？**
+聊天能力由 DeepSeek 提供，App 本身不带模型。密钥只存在本机，用于直接向 `api.deepseek.com` 发请求。
 
-1. 保存密钥后点「获取可用模型」→ 应用会用当前密钥请求 `GET /models`，列出这个账号实际可用的模型。
-2. 点任意一行即切换（当前生效项打勾并高亮）；选择结果本地持久化，聊天与自动标题都用它。
-3. 若当前保存的模型不在返回列表里，会自动选中列表第一项。
+**Q：提示「密钥无效，请检查是否复制完整」？**
+多半是复制时截断了。回平台重新复制整串（`sk-` 开头），粘贴后「保存」再「测试连接」。
 
-- 列表里带「可识图」标签的，是 id 含 `flash` / `vl` / `vision` 的模型（**`deepseek-flash` 明确支持图片识别**，图片对话建议用它）。
-- 拉取失败（密钥错、网络不通、账号无模型）会在按钮下方直接给出可读原因，不会静默失败。
+**Q：提示「账户余额不足」？**
+密钥本身有效，但账户没余额。DeepSeek 按量计费，充值少量金额即可用很久；App 内不做支付跳转。
 
-### 主题
+**Q：想发图片，但回复说看不懂图？**
+先到设置页「获取可用模型」，选带「可识图」标签的模型（如 `deepseek-flash`）。文本模型会拒收图片，错误会原样显示。
 
-设置页「外观」：跟随系统 / 浅色 / 深色。所有颜色集中在 `ui/theme/`，页面里没有硬编码色值，切换后整屏即时生效。
+**Q：人设删不掉，提示被会话引用？**
+这是有意的保护。先去「会话」删掉或改绑那些会话，再回来删人设。
 
-### 外观：背景图与主色调（1.2）
+**Q：为什么有的会话显示「切人设清空」标签？**
+说明该人设开了「切换时重置上下文」——切到它时会问你要不要清空历史。
 
-设置页「外观」分组：
+**Q：输入框下方一直显示 Token 0？**
+流式下的 token 统计依赖服务端在流末尾返回 `usage`；没返回就统计不到。不影响聊天。
 
-1. **聊天背景图**：点「选择图片」→ 系统图片选择器（Photo Picker，无需存储权限）→ 选完自动压缩并保存到 App 私有目录。预期：卡片区立即透出图片，文字带半透明蒙层仍清晰；「移除背景」恢复纯色。
-   - 支持 **JPEG / PNG / WebP**，原图 ≤ **8 MB**，自动按最长边 1600 缩放；其它格式若系统能解码会自动转 JPEG，不能解码则提示「这个格式暂时不支持」。
-   - 文件丢失或解码失败时**自动回落到纯色背景**（默认值兜底）。
-2. **主色调**：8 个预设色 + 色相滑杆，点选/拖动即时改变按钮、标签、选中态颜色；「恢复默认」回到内置蓝（#3A7AFE）。自定义色会被收在低饱和区间（S 0.25~0.75），避免刺眼。
+**Q：回车怎么不是发送？**
+看「设置 → 聊天体验 → 发送快捷键」当前模式。选「回车换行」时是 Enter 换行、**Ctrl+Enter** 发送。
 
-### 图片对话（1.2）
+**Q：卸载重装后数据没了？**
+正常。数据全在本机且 `allowBackup=false`，没有云备份。
 
-在聊天输入框左侧点 ⨁ → 选图 → 输入框上方出现缩略图（含大小）→ 可点 ✕ 移除 → 发送。
+**Q：换手机怎么迁移？**
+当前版本没有导出/导入功能，需要手动重建人设并重新配置密钥。
 
-- **格式**：JPEG / PNG / WebP（明确支持）；HEIC 等其它格式视系统解码能力而定。
-- **大小**：原图 ≤ 8 MB；发送前统一压缩到最长边 1280、质量逐级下调直到 ≤ 1 MB。
-- **数量**：每条消息最多 1 张；可以只发图不写字。
-- **存储**：图片落盘在 App 私有目录，消息只存路径；发送时转成 base64 data URL 塞进 OpenAI 兼容的 `image_url` 消息体。
-- **异常提示**：超限/格式不支持/读取失败/解码失败都会在输入框上方给出中文提示，不会静默丢图。
-- **模型前提**：需要选支持识图的模型（如 `deepseek-flash`，可在设置页「获取可用模型」里选）；若模型不支持，聊天页会原样显示接口返回的错误信息。
+---
 
-### 数据在哪、怎么清
+## 已知限制与边界
 
-- 全部在本机：Room 数据库 `deepseekapichat.db`（会话、消息、人设）+ 加密偏好 `multipromptchat_secure`（密钥）。
-- 卸载 App 会一并删除，且**没有云备份**（`allowBackup=false`），换机需要自己重新配密钥。
-- 只想清空某段对话：会话列表卡片右上角菜单 → 删除会话（会连带删除其消息）。
+下面这些是**有意不做**或当前未做的部分，不算 bug：
 
-### 网络与接口（想改的人看这里）
+- 只对接 DeepSeek 的 OpenAI 兼容接口，不做多供应商；Base URL 与默认模型是常量，可在源码里改。
+- `reasoning_content`（模型的思考过程）只落库不展示。
+- 消息没有分页，超长会话会一次性读入内存；同一会话同时只能有一个进行中的请求。
+- 无云同步 / 账号体系 / 导出备份，卸载即清空。
+- 没有单元测试与 UI 测试；数据库版本 3，升级靠手写 Migration。
+- 文案集中在 `ui/Strings.kt`，尚未迁到 `strings.xml`，暂不支持多语言。
+- Markdown 不是完整 CommonMark：脚注、内嵌 HTML、任务列表不支持。
+- 图片对话每条消息 1 张；背景图在进入界面时于主线程解码（1600px 以内，通常 < 100ms）。
+- 自定义主色调只影响强调色（primary 系）。
+- 引导里的三张平台截图是浏览器截图裁掉标签条后的版本，不是官方插图。
+- 项目未在真机上做完整回归，UI 细节以静态审查为主。
 
-- Base URL：`https://api.deepseek.com`，Endpoint：`POST /chat/completions`
-- 模型：`deepseek-chat`（常量在 `domain/Models.kt` 的 `DEFAULT_MODEL`）
-- 请求体结构：
+---
+
+## 故障排查
+
+面向自己编译/安装的情况；出现问题请带上机型、Android 版本、复现步骤与错误提示原文（**不要贴完整 API Key**）。
+
+**构建报 KSP 版本不匹配 / Room 生成失败**
+KSP 必须与 Kotlin 严格配对（当前 `2.2.21` ↔ `2.2.21-2.0.5`）。改用 kapt：
+
+```kotlin
+plugins { id("org.jetbrains.kotlin.kapt") }
+dependencies { kapt("androidx.room:room-compiler:2.7.2") }
+```
+
+**gradle 找不到 Android SDK**
+优先读 `local.properties` 的 `sdk.dir`，其次 `ANDROID_HOME` / `ANDROID_SDK_ROOT`。
+
+**`gradlew` 报 `gradle-wrapper.jar is missing`**
+说明 wrapper jar 被删（部分 `.gitignore` 模板会误伤 `*.jar`）。执行 `gradle wrapper --gradle-version 8.13 --rerun-tasks`，或直接用 `gradle assembleDebug`。
+
+**回复结束后「正在输入」不消失**
+当前版本已在流式收尾处做了两道保险（收到 `[DONE]` 即关闭通道 + 收集端遇到结束标记即收尾），若仍复现请附上日志；期间可点「停止」强制收尾。
+
+---
+
+## 给开发者
+
+### 项目结构
+
+```
+app/src/main/java/com/example/multipromptchat/
+├── App.kt / MainActivity.kt / AppContainer.kt    # 入口与手写 DI 容器
+├── domain/Models.kt                              # PromptTemplate / Conversation / Message + 常量
+├── data/
+│   ├── local/                                    # Room：AppDatabase(v3)、三个 DAO、实体、映射
+│   ├── remote/                                   # DeepSeekClient（callbackFlow + okhttp-sse）、SseEventParser
+│   ├── image/ImageStore.kt                       # 图片导入、压缩、data URL
+│   └── repository/                               # Prompt / Conversation / Chat / Settings
+└── ui/
+    ├── theme/                                    # Color / Type / Shape / Theme / DynamicColor
+    ├── components/                               # HarmonyCard、PillButton、引导卡、MarkdownText + Parser
+    ├── onboarding/                               # 全屏三步引导
+    ├── chat/ conversations/ prompts/ settings/    # 各页 Screen + ViewModel
+    ├── navigation/                               # AppNavHost、BottomBar
+    ├── Strings.kt                                # 全部文案常量
+    └── util/TimeFormat.kt
+```
+
+### 接口与网络约定
+
+- Base URL：`https://api.deepseek.com`；Endpoint：`POST /chat/completions`，模型列表用 `GET /models`。
+- 默认模型：`deepseek-chat`（常量 `DEFAULT_MODEL`）；用户可在设置页切换。
+- 请求体：
 
 ```json
 {
@@ -280,14 +301,24 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 }
 ```
 
-- 流式解析：`choices[0].delta.content` 追加；`reasoning_content` 入库但不展示；`[DONE]` 结束；空行 / 注释行 / 非法 JSON 一律忽略。
+- 带图时该条消息的 `content` 变成数组：`[{"type":"text"...},{"type":"image_url","image_url":{"url":"data:image/jpeg;base64,..."}}]`。
+- 流式解析：`choices[0].delta.content` 追加；`usage` 累加到会话；`[DONE]` 结束；空行 / 注释行 / 非法 JSON 一律忽略。
 - 取消：Flow 被取消 → `callbackFlow` 的 `awaitClose` 关闭 `EventSource`，HTTP 请求立即中断。
 
-### 改包名
+### 构建环境与命令
 
-1. `app/build.gradle.kts` 改 `namespace` 与 `applicationId`；
-2. 重命名源码目录 `app/src/main/java/com/example/multipromptchat/`（Android Studio 的 Refactor → Rename 会同步 `package` 与 `import`）；
-3. `AndroidManifest.xml` 里 `android:name=".App"` 这类相对名不用动。
+需要 JDK 17 或 21、Android SDK Platform 36、Gradle 8.13+（Wrapper 已随仓库提供）。首次构建需联网下载依赖。
+
+```bash
+./gradlew assembleDebug        # Windows: .\gradlew.bat assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+`local.properties` 里的 `sdk.dir` 指向本机 SDK（该文件已 gitignore）：
+
+```properties
+sdk.dir=C\:\\Users\\<you>\\AppData\\Local\\Android\\Sdk
+```
 
 ### Release 签名
 
@@ -303,118 +334,46 @@ keyPassword=***
 ```bash
 keytool -genkeypair -v -storetype PKCS12 -keystore keystore/release.jks \
   -alias app -keyalg RSA -keysize 2048 -validity 10000
-./gradlew assembleRelease     # → app/build/outputs/apk/release/app-release.apk
+./gradlew assembleRelease
 ```
 
-- 没有 `keystore.properties` 时（新克隆、CI）release 任务照常成功，只是产出未签名的 `app-release-unsigned.apk`。
+- 没有 `keystore.properties` 时（新克隆、CI）release 照常成功，只是产出未签名的 `app-release-unsigned.apk`。
 - **keystore 一定要备份**：换签名后已安装的 App 无法覆盖升级。
 - release 默认 `isMinifyEnabled = false`；要开混淆请先确认 Room 生成的实现类与 OkHttp/okhttp-sse 未被裁掉。
 
----
+### 改包名
 
-### Markdown 渲染的实现取舍
+1. `app/build.gradle.kts` 改 `namespace` 与 `applicationId`；
+2. 重命名源码目录（Android Studio 的 Refactor → Rename 会同步 `package` 与 `import`）；
+3. `AndroidManifest.xml` 里 `android:name=".App"` 这类相对名不用动。
 
-没有引入第三方 Markdown 库，而是在 `ui/components/MarkdownText.kt` + `MarkdownParser.kt` 里自己实现：
+### Markdown 渲染的取舍
 
-- `compose-markdown` 托管在 JitPack，需要额外仓库（多一个不稳定源）；
-- `multiplatform-markdown-renderer-m3` 会引入 Compose Multiplatform 的 material3，和现有 androidx material3 存在类冲突风险。
+没有引入第三方 Markdown 库，而是在 `ui/components/MarkdownText.kt` + `MarkdownParser.kt` 里自己实现：`compose-markdown` 托管在 JitPack（要多加一个仓库），`multiplatform-markdown-renderer-m3` 会拉 Compose Multiplatform 的 material3、与现有 androidx material3 有类冲突风险。
 
-当前实现约 600 行，覆盖聊天场景需要的块级/行内语法，代码块的复制与横向滚动完全可控；解析失败或内容为空时自动退回纯文本，不会白屏。需要完整 CommonMark 时可换库。
+当前实现覆盖聊天需要的块级与行内语法（含嵌套列表按层计号、6 级标题），解析异常或空结果自动退回纯文本；需要完整 CommonMark 时可整体替换这一个组件。
 
-## 常见问题
+### 贡献指南
 
-**Q：为什么一定要先配密钥才能聊天？**
-聊天能力由 DeepSeek 提供，App 本身不带模型。密钥只存在本机，用于直接向 `api.deepseek.com` 发请求。
+欢迎 Issue 与 PR。提交前请跑通 `./gradlew assembleDebug`，并注意：
 
-**Q：提示「密钥无效，请检查是否复制完整」怎么办？**
-多半是复制时截断了。去开放平台重新复制（`sk-` 开头那整串），粘贴后点「保存」再「测试连接」。
-
-**Q：提示「账户余额不足」？**
-密钥本身有效，但账户没余额。DeepSeek 按量计费，充值少量金额即可用很久；App 内不做支付跳转。
-
-**Q：人设删不掉，提示被会话引用？**
-这是有意为之的保护：会话绑着这个模板，直接删会让历史会话的人设信息丢失。先去「会话」删掉或改绑那些会话，再回来删人设。
-
-**Q：为什么有的会话能看到「切人设清空」标签？**
-说明该模板开了 `resetContextOnSwitch`——切到它时会问你要不要清空历史。
-
-**Q：输入框下方一直显示 Token 0？**
-流式的 token 统计依赖服务端在流末尾返回 `usage`。若没返回，就统计不到；这不是记账错误，也不影响聊天。
-
-**Q：回车怎么不是发送？**
-在「设置 → 聊天体验 → 发送快捷键」里看当前模式。选「回车换行」时是 Enter 换行、**Ctrl+Enter** 发送（需要物理键盘或支持 Ctrl 的输入法）。
-
-**Q：卸载重装后数据没了？**
-是的。数据全在本机且 `allowBackup=false`，没有云同步。
-
-**Q：构建报 KSP 版本不匹配 / Room 生成失败？**
-KSP 必须与 Kotlin 严格配对（当前 `2.2.21` ↔ `2.2.21-2.0.5`）。若改用 kapt：
-
-```kotlin
-plugins { id("org.jetbrains.kotlin.kapt") }
-dependencies { kapt("androidx.room:room-compiler:2.7.2") }
-```
-
-**Q：gradle 找不到 Android SDK？**
-优先读 `local.properties` 的 `sdk.dir`，其次 `ANDROID_HOME` / `ANDROID_SDK_ROOT`。
-
-**Q：`gradlew` 报 `gradle-wrapper.jar is missing`？**
-说明 wrapper jar 被删了（部分 `.gitignore` 模板会误伤 `*.jar`）。执行一次 `gradle wrapper --gradle-version 8.13 --rerun-tasks`，或直接用 `gradle assembleDebug`。
-
-### 已知限制
-
-下面这些是**有意不做**的部分，不算 bug；遇到其它问题欢迎开 Issue。
-
-- 只对接 DeepSeek 的 OpenAI 兼容接口，模型名固定为 `deepseek-chat`；没有多模型切换。
-- `reasoning_content` 只落库、不渲染；Markdown 支持常见语法，但不是完整 CommonMark（嵌套列表、脚注、HTML 不渲染）。
-- 消息没有分页，超长会话会一次性读入内存；同一会话同时只能有一个进行中的请求。
-- 无云同步 / 账号体系 / 导出备份，卸载即清空。
-- 没有单元测试与 UI 测试；数据库版本 2，升级靠手写 Migration。
-- 文案集中在 `ui/Strings.kt`，尚未迁到 `strings.xml`，暂不支持多语言。
-- 引导里的三张平台截图是浏览器截图裁掉标签条后的版本，不是官方插图。
-- 图片对话能否被识别取决于所选模型；`deepseek-flash` 支持识图，其它模型若拒绝会在聊天页显示接口原文错误。
-- 每条消息只支持 1 张图；背景图在进入界面时于主线程解码（1600px 以内，通常 < 100ms）。
-- 自定义主色调只影响强调色（primary 系），中性色/错误色仍按主题固定值。
-
----
-
-## 贡献指南
-
-欢迎 Issue 与 PR。为了让改动好合并，麻烦守住下面几条：
-
-**提交前**
-
-1. 跑通 `./gradlew assembleDebug`（有签名配置的再跑 `assembleRelease`）。
-2. 自查是否碰到了 [已知限制](#已知限制) 里明确说不做的范围。
-
-**代码约定**
-
-- 颜色只加在 `ui/theme/`，不在 Composable 里写死色值；需要新语义色就扩 `Theme.kt`。
-- 面向用户的文案集中在 `ui/Strings.kt`（后续要 i18n 时整体搬进 `strings.xml`）。
+- 颜色只加在 `ui/theme/`，不在 Composable 里写死色值；新语义色扩 `Theme.kt`。
+- 面向用户的文案集中在 `ui/Strings.kt`。
 - 不要引入新依赖、不要改 Gradle / AGP / Kotlin 版本、不要引 Hilt / Koin（当前是 Application 级手动 `AppContainer`）。
 - 不要替换 `PromptRepository` / `ConversationRepository` 现有方法签名，需要新能力就加方法。
-- **改动流式相关代码时必须保留两道收尾保险**：`DeepSeekClient` 在收到 `[DONE]` / `onClosed` 后 `close()`，以及 `ChatRepository` 上的 `.takeWhile { it !is StreamChunk.Done }`。删掉它们会出现「回复完了还在转圈」。
-- 数据库当前 version = 2，改表结构请叠加 `Migration`，不要降版本号、也不要依赖破坏性迁移。
+- **改动流式相关代码时保留两道收尾保险**：`DeepSeekClient` 收到 `[DONE]` / `onClosed` 后 `close()`，以及 `ChatRepository` 上的 `.takeWhile { it !is StreamChunk.Done }`。删掉会出现「回复完了还在转圈」。
+- 数据库当前 version = 3，改表结构请叠加 `Migration`，不要降版本号，也不要依赖破坏性迁移。
+- 提交即表示同意你的贡献以 MIT 协议随本项目分发。
 
-**Issue 请附上**
-
-机型与 Android 版本、复现步骤、预期与实际结果；涉及请求失败的请说明错误提示原文（**不要贴完整 API Key**）。
-
-**联系作者**
-
-Bilibili 主页：<https://space.bilibili.com/3546855692568823>
-
-**许可**
-
-提交即表示同意你的贡献以 MIT 协议随本项目分发。
+联系作者：Bilibili <https://space.bilibili.com/3546855692568823>
 
 ---
 
 ## 系统要求
 
-### 运行要求（手机）
+### 手机
 
-App 的安装下限是 **Android 8.0（API 26）**，来自 `app/build.gradle.kts` 的 `minSdk = 26`，并与实际 APK 清单一致（`minSdkVersion:'26'`）。
+安装下限 **Android 8.0（API 26）**，来自 `minSdk = 26`，与实际 APK 清单一致（`minSdkVersion:'26'`）。
 
 | 项目 | 最低 | 推荐 |
 | --- | --- | --- |
@@ -426,41 +385,27 @@ App 的安装下限是 **Android 8.0（API 26）**，来自 `app/build.gradle.kt
 | 其他 | 系统 Keystore（API 26 全都有）、一个浏览器（引导里「打开平台」用）、软键盘；要用 Ctrl+Enter 发送需物理键盘或支持 Ctrl 的输入法 | — |
 | 屏幕 | 手机竖屏（约 360dp 宽）为设计基准 | — |
 
-**为什么下限是 API 26**——代码里有两处硬依赖：
+**为什么下限是 API 26**：① `ui/util/TimeFormat.kt` 直接用 `java.time.*`，这些 API 从 26 才进系统（降到 24 需开 core library desugaring）；② 密钥存储用 `EncryptedSharedPreferences`，需要可用的 Android Keystore，API 26 起 TEE 已是标配。Compose / OkHttp / Room 自身只要求 API 21+。
 
-1. `ui/util/TimeFormat.kt` 直接使用 `java.time.*`（`Instant` / `ZoneId` / `DateTimeFormatter`），这些 API 从 API 26 才进系统；若要降到 API 24，需开启 core library desugaring。
-2. 密钥存储用 `EncryptedSharedPreferences`，要求系统有可用的 Android Keystore；API 26 起 TEE 已是标配（无 TEE 的设备会退回软件实现，仍可用）。
-
-Compose / OkHttp / Room 自身只要求 API 21+，限制不来自它们。
-
-### 构建环境（电脑）
+### 电脑（自己构建）
 
 | 项目 | 要求 |
 | --- | --- |
 | JDK | 17 或 21（`JAVA_HOME` 指向 JDK，不是 JRE） |
 | Android SDK | Platform 36、Build-Tools 36.x |
-| Gradle | 8.13 及以上（AGP 8.13.2 要求 Gradle ≥ 8.13；Wrapper 已随仓库提供） |
+| Gradle | 8.13 及以上（AGP 8.13.2 要求 ≥ 8.13） |
 | Kotlin / KSP | 2.2.21 / 2.2.21-2.0.5 |
-| 其他 | 首次构建需联网下载依赖 |
 
-`local.properties`（gitignore，不随仓库分发）：
-
-```properties
-sdk.dir=C\:\\Users\\<you>\\AppData\\Local\\Android\\Sdk
-```
-
-### 实测依据与说明
+### 实测依据
 
 ```
 minSdkVersion:'26'   targetSdkVersion:'36'   compileSdkVersion:'36'
-APK 9.06 MB（解压后 24.7 MB：dex 23.2 MB / res 0.33 MB / native 36 KB）
+APK 8.69 MB（解压后约 24.7 MB：dex 约 23.2 MB / res 0.33 MB / native 36 KB）
 dex 2 个；native 只有 libandroidx.graphics.path.so（4 个 ABI 各一份）
 权限只有 INTERNET + ACCESS_NETWORK_STATE
 ```
 
-dex 占了 23 MB，是 Compose 带来的体积，所以安装后占用明显大于 APK 本身。
-
-> 以上运行要求为静态分析结论（清单 / APK 构成 / 依赖的 API 要求）；项目**尚未在真机上验证最低配置的实际流畅度**，也没有单元测试。若你打算面向 Android 8 低端机发布，建议先实测首屏与长会话滚动。
+dex 占了 23 MB 是 Compose 带来的体积，所以安装后占用明显大于 APK 本身。以上为静态分析结论，**尚未在真机上验证最低配置的实际流畅度**；面向 Android 8 低端机发布前建议实测首屏与长会话滚动。
 
 ---
 
