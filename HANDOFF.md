@@ -82,6 +82,17 @@
 | 容错 | 解析异常/空结果 → 退回纯文本；未闭合的 ``` 也会被当成代码块吃掉（已用 14 条断言脚本验证） |
 | 为什么不用库 | compose-markdown 在 JitPack（额外仓库）；multiplatform-markdown-renderer-m3 会引入 Compose Multiplatform material3，与 androidx 冲突 |
 
+### H. 1.3：横屏 / 平板 / 折叠屏适配
+
+| 项 | 内容 |
+| --- | --- |
+| 版本 | versionCode 2 → 3，versionName 1.2 → 1.3 |
+| 根因 | 消息气泡写死 `widthIn(max = 300.dp)`，横屏不随窗口放大；Markdown 表格写死 132dp 列宽 + 内部横向滚动，被塞进 300dp 后挤压变形、正文提前折行 |
+| 气泡宽度 | 新增 `bubbleMaxWidth()`（`ChatScreen.kt`）：按 `LocalConfiguration.screenWidthDp` 分档——<600dp 用 86%、600~899 用 66% 封顶 620dp、≥900 用 58% 封顶 720dp。竖屏 360dp 下算得 309dp，与原观感一致 |
+| 内容列 | 聊天页消息列表与输入区限制在 `CHAT_CONTENT_MAX_WIDTH = 960.dp` 并居中（`Box(contentAlignment = Center)`），避免平板下气泡贴到屏幕两端 |
+| 表格 | `MdTable` 改为列宽等权 `weight(1f)` + `fillMaxWidth`，列数 >4 才回退横向滚动；新增私有 `RowScope.MdTableCell` |
+| 系统栏 | `AppNavHost` 的 NavHost 增加 `windowInsetsPadding(WindowInsets.safeDrawing.only(Horizontal))`，横屏侧边系统栏/刘海不再压住内容；竖屏左右 inset 为 0，行为不变 |
+| 验证 | `assembleDebug` / `assembleRelease` 通过；按 360 / 600 / 800 / 1280dp 手算气泡与内容列宽度，均无溢出重叠；**未在折叠屏真机复验** |
 ### 引导的判定规则（重要）
 
 ```

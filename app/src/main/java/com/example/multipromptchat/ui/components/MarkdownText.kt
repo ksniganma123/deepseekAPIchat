@@ -173,6 +173,11 @@ private fun MdQuote(text: String) {
 
 @Composable
 private fun MdTable(block: MdBlock.Table) {
+    // 列宽按等权分配、铺满可用宽度：竖屏不会被挤爆，横屏/平板能吃到多余横向空间。
+    // 只有列数很多（> 4）时才退化成横向滚动，避免每列窄到只剩几个字。
+    val columnCount = maxOf(block.header.size, block.rows.maxOfOrNull { it.size } ?: 0)
+    val useWeights = columnCount in 1..4
+
     Surface(
         shape = MaterialTheme.shapes.small,
         color = MaterialTheme.colorScheme.surfaceVariant,
@@ -180,17 +185,12 @@ private fun MdTable(block: MdBlock.Table) {
     ) {
         Column(
             modifier = Modifier
-                .horizontalScroll(rememberScrollState())
+                .then(if (useWeights) Modifier else Modifier.horizontalScroll(rememberScrollState()))
                 .padding(10.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.Top, modifier = Modifier.fillMaxWidth()) {
                 block.header.forEach { cell ->
-                    Text(
-                        text = inlineAnnotated(cell, MaterialTheme.colorScheme),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.width(132.dp).padding(end = 12.dp),
-                    )
+                    MdTableCell(text = cell, bold = true, weight = if (useWeights) 1f else null)
                 }
             }
             HorizontalDivider(
@@ -198,19 +198,32 @@ private fun MdTable(block: MdBlock.Table) {
                 modifier = Modifier.padding(vertical = 6.dp),
             )
             block.rows.forEach { row ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(verticalAlignment = Alignment.Top, modifier = Modifier.fillMaxWidth()) {
                     row.forEach { cell ->
-                        Text(
-                            text = inlineAnnotated(cell, MaterialTheme.colorScheme),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.width(132.dp).padding(end = 12.dp),
-                        )
+                        MdTableCell(text = cell, bold = false, weight = if (useWeights) 1f else null)
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun androidx.compose.foundation.layout.RowScope.MdTableCell(
+    text: String,
+    bold: Boolean,
+    weight: Float?,
+) {
+    Text(
+        text = inlineAnnotated(text, MaterialTheme.colorScheme),
+        style = if (bold) MaterialTheme.typography.labelLarge else MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = if (weight != null) {
+            Modifier.weight(weight).padding(end = 12.dp)
+        } else {
+            Modifier.width(140.dp).padding(end = 12.dp)
+        },
+    )
 }
 
 /** 代码块：语法高亮 + 横向滚动 + 右上角复制 */

@@ -7,6 +7,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import com.example.multipromptchat.data.image.ImageStore
 import kotlinx.coroutines.launch
@@ -82,6 +83,7 @@ import com.example.multipromptchat.AppContainer
 import com.example.multipromptchat.domain.Message
 import com.example.multipromptchat.domain.MessageRole
 import com.example.multipromptchat.domain.PromptTemplate
+import androidx.compose.ui.unit.Dp
 import com.example.multipromptchat.ui.Strings
 import com.example.multipromptchat.ui.theme.screenBackgroundColor
 import com.example.multipromptchat.ui.components.ApiKeyMissingCard
@@ -366,14 +368,17 @@ private fun MessageList(
 ) {
     val visible = remember(messages) { messages.filter { it.role != MessageRole.SYSTEM } }
 
-    // reverseLayout keeps the newest message pinned to the bottom, so streaming
-    // output is always visible without manual scroll bookkeeping.
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        reverseLayout = true,
-    ) {
+    // 1.3：横屏/平板下把消息列限制在 CHAT_CONTENT_MAX_WIDTH 内并居中，
+    // 避免气泡被拉到屏幕两端、中间大片空白；竖屏（<960dp）宽度不受影响。
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        // reverseLayout keeps the newest message pinned to the bottom, so streaming
+        // output is always visible without manual scroll bookkeeping.
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().widthIn(max = CHAT_CONTENT_MAX_WIDTH),
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            reverseLayout = true,
+        ) {
         if (isStreaming) {
             item(key = "streaming-bubble") {
                 StreamingBubble(text = streamingText)
@@ -381,6 +386,7 @@ private fun MessageList(
         }
         items(items = visible.asReversed(), key = { message -> message.id }) { message ->
             MessageBubble(message = message)
+        }
         }
     }
 }
@@ -404,7 +410,7 @@ private fun MessageBubble(message: Message) {
                 MaterialTheme.colorScheme.surface
             },
             shadowElevation = if (isUser) 0.dp else 1.dp,
-            modifier = Modifier.widthIn(max = 300.dp),
+            modifier = Modifier.widthIn(max = bubbleMaxWidth()),
         ) {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                 // 1.2：用户消息若带图，先把图显示出来
@@ -462,7 +468,7 @@ private fun StreamingBubble(text: String) {
             shape = RoundedCornerShape(topStart = 8.dp, topEnd = 20.dp, bottomEnd = 20.dp, bottomStart = 20.dp),
             color = MaterialTheme.colorScheme.surface,
             shadowElevation = 1.dp,
-            modifier = Modifier.widthIn(max = 300.dp),
+            modifier = Modifier.widthIn(max = bubbleMaxWidth()),
         ) {
             Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                 Text(
@@ -497,11 +503,18 @@ private fun ChatInputBar(
 ) {
     val canSend = value.isNotBlank() || attachedImage != null
 
-    Column(
+    // 1.3：输入区同样限制内容宽度并居中，和消息列对齐；insets 仍由外层承担。
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .imePadding()
+            .imePadding(),
+        contentAlignment = Alignment.Center,
+    ) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .widthIn(max = CHAT_CONTENT_MAX_WIDTH)
             .padding(horizontal = 20.dp)
             .padding(top = 4.dp, bottom = 12.dp),
     ) {
@@ -632,8 +645,26 @@ private fun ChatInputBar(
             )
         }
     }
+    }
 }
 
+/** 1.3：横屏/平板下聊天内容列的最大宽度（超过则居中，不再拉满全屏）。 */
+private val CHAT_CONTENT_MAX_WIDTH = 960.dp
+
+/**
+ * 1.3 横屏适配：气泡最大宽度随窗口变化，而不是写死 300dp。
+ * 竖屏（<600dp）沿用接近原来的比例，横屏/折叠屏/平板按窗口比例放大并设上限，
+ * 让长段落和表格有足够横向空间，同时不出现「一行只有几个字」的超宽气泡。
+ */
+@Composable
+private fun bubbleMaxWidth(): Dp {
+    val widthDp = LocalConfiguration.current.screenWidthDp
+    return when {
+        widthDp >= 900 -> minOf(widthDp.dp * 0.58f, 720.dp)
+        widthDp >= 600 -> minOf(widthDp.dp * 0.66f, 620.dp)
+        else -> minOf(widthDp.dp * 0.86f, 420.dp)
+    }
+}
 /**
  * 增量 C-1：
  * - 回车发送模式：Enter 发送，Shift+Enter 换行。
@@ -780,3 +811,4 @@ private fun PromptPickerSheet(
         }
     }
 }
+

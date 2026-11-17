@@ -1,5 +1,9 @@
 package com.example.multipromptchat.ui.navigation
 
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -114,7 +118,13 @@ fun AppNavHost(container: AppContainer) {
                 NavHost(
                     navController = navController,
                     startDestination = Routes.CONVERSATIONS,
-                    modifier = Modifier.padding(padding),
+                    // 1.3：横屏时系统栏/刘海在左右两侧，这里统一吃掉水平安全区；
+                    // 竖屏时左右 inset 为 0，等同原行为。
+                    modifier = Modifier
+                        .padding(padding)
+                        .windowInsetsPadding(
+                            WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)
+                        ),
                 ) {
                 composable(Routes.CONVERSATIONS) {
                     ConversationListScreen(
