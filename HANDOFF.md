@@ -112,6 +112,7 @@
 | 宽度 | 左栏固定 `RailWidth = 88.dp`；中栏 `maxWidth / 3 - RailWidth`（并 `coerceAtLeast(160.dp)`），使「左 + 中 ≈ 总宽 1/3」；右栏吃掉剩余（≈2/3）。设置页无详情，占满中 + 右 |
 | 状态 | `currentTab` / `openConversationId`（-1 = 未选）/ `openPromptId`（-1 未选、-2 新建）均 `rememberSaveable`，旋转与分屏不丢 |
 | 交互 | 未选会话时右栏显示 `Strings.detailPickConversation`（「请选择一个会话喵~」）；`onBack` 只把 `openConversationId` 置 -1，不动返回栈；Prompt 栏选中项在右栏打开编辑页 |
+| 窄栏文字竖排 | 1.4.1：PromptCardBody 原来把「标签行 + 用量文字」放在同一 Row 并用 weight(1f)，中栏卡片仅约 260dp 时用量文字被压到 0 宽 → 一列一个字。改为两行（标签行可横向滚动 + 用量独占一行），并给 PromptCard 增加 compact（预览 2 行） |
 | 窄栏适配 | `PageTitle` 新增 `titleStyle` 参数；`ConversationListScreen` / `PromptListScreen` 新增 `compact` 参数（小标题、无副标题、隐藏「批量选择」），由 shell 传 `true`，竖屏默认 `false` 不受影响 |
 | 验证 | `assembleDebug` / `assembleRelease` 通过；按 520 / 656 / 800 / 1280dp 手算栏宽（520→160+88=248(48%)、656→160+88=248(38%)、800→178+88=266(33%)、1280→338+88=426(33%)）。**1.3 首次真机验证失败案例**：VM 窗口 1722×983px ≈ 656dp@420dpi，旧阈值 700dp + `Configuration` 判断导致未切换 → 1.4 已修；仍**未在真机复验** |
 ### 引导的判定规则（重要）

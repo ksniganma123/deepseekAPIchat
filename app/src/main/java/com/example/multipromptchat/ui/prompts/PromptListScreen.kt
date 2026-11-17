@@ -1,6 +1,8 @@
 package com.example.multipromptchat.ui.prompts
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -169,6 +171,7 @@ fun PromptListScreen(
                     items(items = state.prompts, key = { usage -> usage.prompt.id }) { usage ->
                         PromptCard(
                             usage = usage,
+                            compact = compact,
                             selectionMode = state.selection.active,
                             selected = usage.prompt.id in state.selection.ids,
                             onToggleSelected = { viewModel.toggleSelected(usage.prompt.id) },
@@ -259,6 +262,7 @@ fun PromptListScreen(
 @Composable
 private fun PromptCard(
     usage: PromptUsage,
+    compact: Boolean,
     selectionMode: Boolean,
     selected: Boolean,
     onToggleSelected: () -> Unit,
@@ -276,7 +280,7 @@ private fun PromptCard(
         ) {
             Row(verticalAlignment = Alignment.Top) {
                 Column(modifier = Modifier.weight(1f)) {
-                    PromptCardBody(usage = usage)
+                    PromptCardBody(usage = usage, compact = compact)
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Checkbox(checked = selected, onCheckedChange = { onToggleSelected() })
@@ -284,7 +288,7 @@ private fun PromptCard(
         }
     } else {
         HarmonyCard {
-            PromptCardBody(usage = usage)
+            PromptCardBody(usage = usage, compact = compact)
             Spacer(modifier = Modifier.height(8.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 TextButton(onClick = onEdit) {
@@ -305,7 +309,7 @@ private fun PromptCard(
 }
 
 @Composable
-private fun PromptCardBody(usage: PromptUsage) {
+private fun PromptCardBody(usage: PromptUsage, compact: Boolean) {
     Text(
         text = usage.prompt.name,
         style = MaterialTheme.typography.titleMedium,
@@ -318,25 +322,34 @@ private fun PromptCardBody(usage: PromptUsage) {
         text = usage.prompt.systemPrompt,
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 3,
+        // 窄栏（横屏中栏）下少两行，避免卡片高得离谱
+        maxLines = if (compact) 2 else 3,
         overflow = TextOverflow.Ellipsis,
     )
     Spacer(modifier = Modifier.height(10.dp))
-    Row(verticalAlignment = Alignment.CenterVertically) {
+
+    // 标签行与用量文字分成两行：之前挤在同一个 Row 里用 weight(1f)，
+    // 卡片变窄时用量文字会被压到 0 宽，变成「一列一个字」的竖排。
+    // 极窄时标签行可横向滚动，不会被裁掉半截。
+    Row(
+        modifier = Modifier.horizontalScroll(rememberScrollState()),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
         PromptTag(text = "t=${formatParam(usage.prompt.temperature)}")
-        Spacer(modifier = Modifier.width(6.dp))
         PromptTag(text = "p=${formatParam(usage.prompt.topP)}")
         if (usage.prompt.resetContextOnSwitch) {
-            Spacer(modifier = Modifier.width(6.dp))
             PromptTag(text = "切人设清空")
         }
-        Spacer(modifier = Modifier.weight(1f))
-        Text(
-            text = Strings.usageCount(usage.conversationCount),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
+    Spacer(modifier = Modifier.height(6.dp))
+    Text(
+        text = Strings.usageCount(usage.conversationCount),
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 private fun formatParam(value: Float): String {
