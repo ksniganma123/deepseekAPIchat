@@ -108,12 +108,12 @@
 | 项 | 内容 |
 | --- | --- |
 | 新增 | `ui/navigation/LandscapeShell.kt`：左「选项栏」+ 中「列表」+ 右「详情」 |
-| 启用条件 | `screenWidthDp > screenHeightDp && screenWidthDp >= LANDSCAPE_MIN_WIDTH_DP (700)`；竖屏与手机横屏继续用 `Scaffold + NavHost + BottomBar` |
-| 宽度 | 左栏固定 `RailWidth = 96.dp`；中栏 `maxWidth / 3 - RailWidth`（并 `coerceAtLeast(180.dp)`），使「左 + 中 ≈ 总宽 1/3」；右栏吃掉剩余（≈2/3）。设置页无详情，占满中 + 右 |
+| 启用条件 | **1.4 修正**：用 `BoxWithConstraints` 的实测尺寸 `maxWidth > maxHeight && maxWidth >= 520.dp`（`LANDSCAPE_MIN_WIDTH_DP = 520`）。**不再用** `Configuration.screenWidthDp` —— 桌面 / 自由窗口模式下它可能报显示器尺寸，1.3 因此"看起来没生效"；窄窗口继续用 `Scaffold + NavHost + BottomBar` |
+| 宽度 | 左栏固定 `RailWidth = 88.dp`；中栏 `maxWidth / 3 - RailWidth`（并 `coerceAtLeast(160.dp)`），使「左 + 中 ≈ 总宽 1/3」；右栏吃掉剩余（≈2/3）。设置页无详情，占满中 + 右 |
 | 状态 | `currentTab` / `openConversationId`（-1 = 未选）/ `openPromptId`（-1 未选、-2 新建）均 `rememberSaveable`，旋转与分屏不丢 |
 | 交互 | 未选会话时右栏显示 `Strings.detailPickConversation`（「请选择一个会话喵~」）；`onBack` 只把 `openConversationId` 置 -1，不动返回栈；Prompt 栏选中项在右栏打开编辑页 |
 | 窄栏适配 | `PageTitle` 新增 `titleStyle` 参数；`ConversationListScreen` / `PromptListScreen` 新增 `compact` 参数（小标题、无副标题、隐藏「批量选择」），由 shell 传 `true`，竖屏默认 `false` 不受影响 |
-| 验证 | `assembleDebug` / `assembleRelease` 通过；按 700 / 800 / 1104 / 1280dp 手算栏宽（700→180+96=276(39%)、800→171+96=267(33%)、1280→331+96=427(33%)）；**未在折叠屏/平板真机复验** |
+| 验证 | `assembleDebug` / `assembleRelease` 通过；按 520 / 656 / 800 / 1280dp 手算栏宽（520→160+88=248(48%)、656→160+88=248(38%)、800→178+88=266(33%)、1280→338+88=426(33%)）。**1.3 首次真机验证失败案例**：VM 窗口 1722×983px ≈ 656dp@420dpi，旧阈值 700dp + `Configuration` 判断导致未切换 → 1.4 已修；仍**未在真机复验** |
 ### 引导的判定规则（重要）
 
 ```

@@ -65,7 +65,7 @@ import com.example.multipromptchat.ui.settings.SettingsScreen
  * 只在「够宽的横屏」（宽度 ≥ [LANDSCAPE_MIN_WIDTH_DP]）启用；手机横屏仍走竖屏那套
  * 单页 + 底部导航，避免三栏各自只剩几个字宽。
  */
-const val LANDSCAPE_MIN_WIDTH_DP = 700
+const val LANDSCAPE_MIN_WIDTH_DP = 520
 
 private data class RailTab(val route: String, val label: String, val icon: ImageVector)
 
@@ -75,7 +75,7 @@ private val railTabs = listOf(
     RailTab(Routes.SETTINGS, Strings.tabSettings, Icons.Filled.Settings),
 )
 
-private val RailWidth = 96.dp
+private val RailWidth = 88.dp
 
 @Composable
 fun LandscapeShell(container: AppContainer) {
@@ -91,7 +91,7 @@ fun LandscapeShell(container: AppContainer) {
         ) {
             // 目标比例：左栏 + 中栏 = 总宽 1/3，右侧详情 = 2/3。
             // 左栏固定 96dp，中栏用「总宽三分之一减去左栏」精确补齐；窗口过窄时给 200dp 下限。
-            val middleWidth = (maxWidth / 3 - RailWidth).coerceAtLeast(180.dp)
+            val middleWidth = (maxWidth / 3 - RailWidth).coerceAtLeast(160.dp)
             val rightWidth = (maxWidth - RailWidth - middleWidth).coerceAtLeast(0.dp)
 
             Row(modifier = Modifier.fillMaxSize()) {

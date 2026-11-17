@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -20,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -76,7 +78,9 @@ fun AppNavHost(container: AppContainer) {
     val hasWallpaper = wallpaper != null
 
     CompositionLocalProvider(LocalWallpaperActive provides hasWallpaper) {
-        Box(modifier = Modifier.fillMaxSize()) {
+        // 1.4：布局切换改用「实测窗口尺寸」，不再依赖 Configuration.screenWidthDp ——
+        // 桌面/自由窗口模式下 Configuration 可能仍报显示器的 dp 尺寸，导致门控永不成立。
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             if (wallpaper != null) {
                 androidx.compose.foundation.Image(
                     bitmap = wallpaper.asImageBitmap(),
@@ -92,10 +96,10 @@ fun AppNavHost(container: AppContainer) {
                 )
             }
 
-            // 1.3：够宽的横屏切三栏（左选项 / 中列表 / 右详情），竖屏与手机横屏保持原布局。
-            val configuration = LocalConfiguration.current
-            val isWideLandscape = configuration.screenWidthDp > configuration.screenHeightDp &&
-                configuration.screenWidthDp >= LANDSCAPE_MIN_WIDTH_DP
+            // 够宽的横屏切三栏（左选项 / 中列表 / 右详情），竖屏与窄窗口保持原布局。
+            // 用 maxWidth/maxHeight（BoxWithConstraints 实测值），对桌面自由窗口/分屏同样成立。
+            val isWideLandscape =
+                maxWidth > maxHeight && maxWidth >= LANDSCAPE_MIN_WIDTH_DP.dp
 
             if (isWideLandscape) {
                 LandscapeShell(container = container)
