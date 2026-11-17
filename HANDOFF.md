@@ -115,6 +115,14 @@
 | 窄栏文字竖排 | 1.4.1：PromptCardBody 原来把「标签行 + 用量文字」放在同一 Row 并用 weight(1f)，中栏卡片仅约 260dp 时用量文字被压到 0 宽 → 一列一个字。改为两行（标签行可横向滚动 + 用量独占一行），并给 PromptCard 增加 compact（预览 2 行） |
 | 窄栏适配 | `PageTitle` 新增 `titleStyle` 参数；`ConversationListScreen` / `PromptListScreen` 新增 `compact` 参数（小标题、无副标题、隐藏「批量选择」），由 shell 传 `true`，竖屏默认 `false` 不受影响 |
 | 验证 | `assembleDebug` / `assembleRelease` 通过；按 520 / 656 / 800 / 1280dp 手算栏宽（520→160+88=248(48%)、656→160+88=248(38%)、800→178+88=266(33%)、1280→338+88=426(33%)）。**1.3 首次真机验证失败案例**：VM 窗口 1722×983px ≈ 656dp@420dpi，旧阈值 700dp + `Configuration` 判断导致未切换 → 1.4 已修；仍**未在真机复验** |
+### K. 1.5：猫娘风文案 + 背景透明度
+
+| 项 | 内容 |
+| --- | --- |
+| 文案 | 只在「空状态 / 占位 / 成功提示 / 欢迎页」这类非关键位置加「喵~」和颜文字（共 13 处，含欢迎页主标语 `(=^･ω･^=)`）；错误提示、删除确认、权限说明保持理性措辞，避免影响判断 |
+| 透明度 | `AppearanceSettings.backgroundOpacity`（0.05~0.95，默认 0.18，key `appearance_background_opacity`）；渲染时蒙层 alpha = `1 - opacity`，设置页「外观 → 聊天背景图」内滑杆，`Slider` 每次变化即写入并推给 `AppNavHost`，即时生效且持久化 |
+| 版本 | `versionCode 5` / `versionName 1.5` |
+| 验证 | `assembleDebug` / `assembleRelease` 通过；`dist/deepseekAPIchat-1.5.apk` 的 aapt2 已核 1.5/5。**未在真机验证**滑杆观感与颜文字在各字体的显示 |
 ### 引导的判定规则（重要）
 
 ```

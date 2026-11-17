@@ -223,6 +223,11 @@ class SettingsViewModel(
         settingsRepository.setAccentColor(argb)
     }
 
+    /** 1.5：背景图透明度（显示强度），拖动即时生效 */
+    fun setBackgroundOpacity(value: Float) {
+        settingsRepository.setBackgroundOpacity(value)
+    }
+
     /** 1.2：把图片导入失败的原因翻译成人话显示在设置页顶部。 */
     fun reportImageError(failure: ImageStore.Failure) {
         message.value = when (failure) {

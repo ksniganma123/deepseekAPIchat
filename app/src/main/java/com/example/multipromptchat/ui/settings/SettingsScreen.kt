@@ -65,6 +65,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlin.math.roundToInt
 import com.example.multipromptchat.AppContainer
+import com.example.multipromptchat.data.repository.BACKGROUND_OPACITY_MAX
+import com.example.multipromptchat.data.repository.BACKGROUND_OPACITY_MIN
 import com.example.multipromptchat.data.repository.CONTEXT_MESSAGES_MAX
 import com.example.multipromptchat.data.repository.CONTEXT_MESSAGES_MIN
 import com.example.multipromptchat.data.repository.ThemeMode
@@ -557,6 +559,38 @@ fun SettingsScreen(
                     )
                 }
             }
+            // 1.5：背景透明度（仅在有图时可用），拖动即时生效
+            if (state.appearance.hasBackground) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = Strings.appearanceBackgroundOpacityTitle,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = Strings.appearanceBackgroundOpacityDesc,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text(
+                        text = Strings.backgroundOpacityValue(
+                            (state.appearance.backgroundOpacity * 100f).roundToInt()
+                        ),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                Slider(
+                    value = state.appearance.backgroundOpacity,
+                    onValueChange = { viewModel.setBackgroundOpacity(it) },
+                    valueRange = BACKGROUND_OPACITY_MIN..BACKGROUND_OPACITY_MAX,
+                )
+            }
+
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = Strings.imageLimitsHint,

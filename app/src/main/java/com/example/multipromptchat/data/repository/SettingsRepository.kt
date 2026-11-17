@@ -18,6 +18,10 @@ const val CONTEXT_MESSAGES_DEFAULT = 20
 /** 默认主色调（与 ui/theme/Color.kt 的 LightAccent 一致） */
 const val DEFAULT_ACCENT_ARGB = 0xFF3A7AFEL
 
+const val BACKGROUND_OPACITY_MIN = 0.05f
+const val BACKGROUND_OPACITY_MAX = 0.95f
+const val DEFAULT_BACKGROUND_OPACITY = 0.18f
+
 /**
  * 1.2 外观设置：自定义背景图 + 自定义主色调。两者都有默认值兜底，
  * 背景图为空 / 文件丢失时退回纯色背景。
@@ -27,6 +31,11 @@ data class AppearanceSettings(
     val backgroundPath: String? = null,
     /** 主色调种子色（ARGB）。 */
     val accentArgb: Long = DEFAULT_ACCENT_ARGB,
+    /**
+     * 背景图的显示强度 0.05~0.95（越大图片越明显，越小越接近纯色）。
+     * 渲染时用 (1 - 该值) 作为蒙层透明度，默认 0.18 与 1.2/1.3 的观感一致。
+     */
+    val backgroundOpacity: Float = DEFAULT_BACKGROUND_OPACITY,
 ) {
     val hasBackground: Boolean get() = !backgroundPath.isNullOrBlank()
 }
@@ -151,6 +160,10 @@ class SettingsRepository(context: Context) {
         }
         _appearance.value = AppearanceSettings(
             backgroundPath = validBackground,
+            backgroundOpacity = runCatching {
+                plainPreferences.getFloat(KEY_APPEARANCE_OPACITY, DEFAULT_BACKGROUND_OPACITY)
+            }.getOrDefault(DEFAULT_BACKGROUND_OPACITY)
+                .coerceIn(BACKGROUND_OPACITY_MIN, BACKGROUND_OPACITY_MAX),
             accentArgb = runCatching {
                 plainPreferences.getLong(KEY_APPEARANCE_ACCENT, DEFAULT_ACCENT_ARGB)
             }.getOrDefault(DEFAULT_ACCENT_ARGB),
@@ -222,6 +235,14 @@ class SettingsRepository(context: Context) {
         _appearance.value = current.copy(backgroundPath = path)
     }
 
+    /** 1.5：设置背景图透明度（显示强度），即时生效并持久化 */
+    fun setBackgroundOpacity(value: Float) {
+        val current = _appearance.value
+        val clamped = value.coerceIn(BACKGROUND_OPACITY_MIN, BACKGROUND_OPACITY_MAX)
+        plainPreferences.edit().putFloat(KEY_APPEARANCE_OPACITY, clamped).apply()
+        _appearance.value = current.copy(backgroundOpacity = clamped)
+    }
+
     /** 1.2：设置主色调（ARGB），即时生效 */
     fun setAccentColor(argb: Long) {
         val current = _appearance.value
@@ -270,5 +291,6 @@ class SettingsRepository(context: Context) {
         const val KEY_CHAT_MODEL = "chat_model"
         const val KEY_APPEARANCE_BACKGROUND = "appearance_background_path"
         const val KEY_APPEARANCE_ACCENT = "appearance_accent_argb"
+        const val KEY_APPEARANCE_OPACITY = "appearance_background_opacity"
     }
 }

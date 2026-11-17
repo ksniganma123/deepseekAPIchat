@@ -92,7 +92,12 @@ fun AppNavHost(container: AppContainer) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background.copy(alpha = 0.82f)),
+                        // 1.5：蒙层不透明度 = 1 - 用户设的背景透明度，设置页滑动即时生效
+                        .background(
+                            MaterialTheme.colorScheme.background.copy(
+                                alpha = (1f - appearance.backgroundOpacity).coerceIn(0.05f, 0.95f),
+                            )
+                        ),
                 )
             }
 

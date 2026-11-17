@@ -12,8 +12,8 @@ object Strings {
     const val tabSettings = "设置"
 
     // 1.3：横屏三栏的详情占位
-    const val detailPickConversation = "请选择一个会话喵~"
-    const val detailPickPrompt = "选择或新建一个人设喵~"
+    const val detailPickConversation = "请选择一个会话喵~（=^･ω･^=）"
+    const val detailPickPrompt = "选择或新建一个人设喵~（｡•̀ᴗ-）✧"
 
     // Common
     const val cancel = "取消"
@@ -29,8 +29,8 @@ object Strings {
 
     // Conversation list
     const val conversationsTitle = "会话"
-    const val emptyConversationsTitle = "还没有会话"
-    const val emptyConversationsDesc = "点右上角「新建」，选一个人设就能开始聊。"
+    const val emptyConversationsTitle = "还没有会话喵~"
+    const val emptyConversationsDesc = "点右上角「新建」，选一个人设就能开始聊～ (๑•̀ㅂ•́)و✧"
     const val newConversationTitle = "新建会话"
     const val conversationTitleLabel = "标题（可选）"
     const val conversationTitlePlaceholder = "留空则自动命名"
@@ -48,7 +48,7 @@ object Strings {
     const val inputHint = "发消息…"
     const val send = "发送"
     const val stop = "停止生成"
-    const val thinking = "思考中…"
+    const val thinking = "让我想想喵…"
     const val switchPromptHint = "点标签切换人设"
     const val switchPromptTitle = "切换人设"
     const val switchPromptSubtitle = "只影响之后的对话风格"
@@ -57,8 +57,8 @@ object Strings {
     const val switchPromptResetTitle = "要清空历史吗？"
     const val currentPrompt = "当前人设"
     const val noPrompt = "未绑定"
-    const val emptyChatTitle = "开始聊天"
-    const val emptyChatDesc = "输入问题并发送，回复会逐字流式出现。"
+    const val emptyChatTitle = "开始聊天喵~"
+    const val emptyChatDesc = "输入问题并发送，回复会逐字流式出现～ (＾・ω・＾)"
     const val dismiss = "知道了"
     const val apiKeyMissing = "还没有填写密钥，先去设置页填一下吧"
     const val loading = "加载中…"
@@ -78,15 +78,15 @@ object Strings {
     const val deletePromptTitle = "删除 Prompt"
     const val nameRequired = "名称不能为空"
     const val systemPromptRequired = "角色设定不能为空"
-    const val emptyPromptsTitle = "还没有 Prompt 模板"
-    const val emptyPromptsDesc = "每个模板是一段角色设定，会话内可随时切换。"
+    const val emptyPromptsTitle = "还没有 Prompt 模板喵~"
+    const val emptyPromptsDesc = "每个模板是一段角色设定，会话内可随时切换～ (｡•̀ᴗ-)✧"
 
     // Settings
     const val settingsTitle = "设置"
     const val apiKeySection = "连接码"
     const val apiKeyLabel = "DeepSeek 密钥"
     const val apiKeyPlaceholder = "sk-…"
-    const val apiKeySaved = "已加密保存"
+    const val apiKeySaved = "已加密保存喵~"
     const val apiKeyCleared = "已清除 API Key"
     const val apiKeyEmpty = "尚未设置 API Key"
     const val apiKeyStored = "已保存："
@@ -100,7 +100,7 @@ object Strings {
     const val aboutSection = "关于"
     const val appName = "deepseekAPIchat"
     const val appTagline = "多 Prompt 人设 · 流式对话"
-    const val appVersion = "版本 1.4"
+    const val appVersion = "版本 1.5"
     const val copyrightHolder = "© 2026 K5NGM_JiYuxi"
     const val licenseSummary = "本项目以 MIT 协议开源：可自由使用、修改、分发，请保留版权声明与许可声明。"
     const val viewLicense = "查看许可证文本"
@@ -133,7 +133,7 @@ object Strings {
     // ---- 增量 A：密钥配置引导 / 测试连接 -------------------------------
     const val testConnection = "测试连接"
     const val testingConnection = "正在测试连接…"
-    const val connectionOk = "连接正常，可以开始聊天了"
+    const val connectionOk = "连接正常，可以开始聊天了喵~"
     const val apiKeyInvalid = "密钥无效，请检查是否复制完整"
     const val apiKeyNoBalance = "密钥能用，但账户余额不足"
     const val apiKeyRateLimited = "请求太频繁了，稍后再试"
@@ -171,7 +171,7 @@ object Strings {
 
     // 第 1 步：欢迎 + 这是什么软件
     const val onboardingWelcomeTitle = "欢迎使用 deepseekAPIchat"
-    const val onboardingWelcomeLead = "一个人设不够用？同一个会话里，随时换。"
+    const val onboardingWelcomeLead = "一个人设不够用喵？同一个会话里，随时换～ (=^･ω･^=)"
     const val welcomeCoreLabel = "两个核心能力"
     const val welcomeFeatureSwitchTitle = "多个人设，随时切换"
     const val welcomeFeatureSwitchBody =
@@ -239,6 +239,8 @@ object Strings {
     const val appearanceAccentDefault = "默认蓝"
 
     // 图片相关的通用上限说明（与 ImageStore 常量保持一致）
+    const val appearanceBackgroundOpacityTitle = "背景透明度"
+    const val appearanceBackgroundOpacityDesc = "数值越大图片越明显，越小越接近纯色"
     const val imageLimitsHint = "支持 JPEG / PNG / WebP，单张不超过 8 MB"
     const val imageProcessing = "正在压缩图片…"
 
@@ -295,6 +297,8 @@ object Strings {
     // ---- 1.2：图片附件的错误提示（都用人话） ----------------------------
     fun imageAttached(sizeKb: Long): String = "已附加 1 张图片（约 ${sizeKb} KB）"
 
+    fun backgroundOpacityValue(percent: Int): String = "$percent%"
+
     fun imageTooLarge(maxMb: Int): String = "图片太大了，请换一张小于 ${maxMb} MB 的"
 
     fun imageUnsupported(): String = "这个格式暂时不支持，请换成 JPEG / PNG / WebP"
@@ -307,7 +311,7 @@ object Strings {
 
     fun promptSelectedCount(count: Int): String = "已选 $count 项"
 
-    fun promptsDeleted(count: Int): String = "已删除 $count 个人设"
+    fun promptsDeleted(count: Int): String = "已删除 $count 个人设喵~"
 
     fun promptsDeletedPartial(deleted: Int, blocked: Int, failed: Int): String {
         val parts = mutableListOf("已删除 $deleted 个")
