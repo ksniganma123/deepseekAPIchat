@@ -103,6 +103,17 @@
 | 根因 3 | 判定条件写死 `title != DEFAULT_CONVERSATION_TITLE`，空标题（导入/迁移）永远不补；且**没有任何本地兜底**。 |
 | 修复 | ① 新增纯逻辑 `TitleBuilder`（`sanitize` 清洗前缀/引号/Markdown/句末标点 + `localFallback` 首条消息截断）；② `generateTitle` 改两段式：常规组合失败后，改发「仅 user、不带 temperature/top_p」的请求，并从 `content` → `reasoning_content` 依次取候选；③ `max_tokens` 32 → 64，输入截断常量独立；④ `complete()` 的 `temperature`/`topP` 改为可空（null 即不下发），`CompletionResult.Success` 增加 `reasoning`；⑤ 仓库层：标题为空或等于默认值都尝试，AI 拿不到就用本地兜底标题。 |
 | 验证 | kotlinc 跑了 14 条纯逻辑断言（清洗前缀/粗体/首行/截断 10 字/占位词/空白/null；本地兜底：普通问句/有序列表前缀/`##` 标题/取首句/空白/null），全部 PASS；`assembleDebug` / `assembleRelease` 通过。**未在真机上对真实模型复验**（需要 API Key 与额度）。 |
+### J. 1.3：微信式三栏横屏
+
+| 项 | 内容 |
+| --- | --- |
+| 新增 | `ui/navigation/LandscapeShell.kt`：左「选项栏」+ 中「列表」+ 右「详情」 |
+| 启用条件 | `screenWidthDp > screenHeightDp && screenWidthDp >= LANDSCAPE_MIN_WIDTH_DP (700)`；竖屏与手机横屏继续用 `Scaffold + NavHost + BottomBar` |
+| 宽度 | 左栏固定 `RailWidth = 96.dp`；中栏 `maxWidth / 3 - RailWidth`（并 `coerceAtLeast(180.dp)`），使「左 + 中 ≈ 总宽 1/3」；右栏吃掉剩余（≈2/3）。设置页无详情，占满中 + 右 |
+| 状态 | `currentTab` / `openConversationId`（-1 = 未选）/ `openPromptId`（-1 未选、-2 新建）均 `rememberSaveable`，旋转与分屏不丢 |
+| 交互 | 未选会话时右栏显示 `Strings.detailPickConversation`（「请选择一个会话喵~」）；`onBack` 只把 `openConversationId` 置 -1，不动返回栈；Prompt 栏选中项在右栏打开编辑页 |
+| 窄栏适配 | `PageTitle` 新增 `titleStyle` 参数；`ConversationListScreen` / `PromptListScreen` 新增 `compact` 参数（小标题、无副标题、隐藏「批量选择」），由 shell 传 `true`，竖屏默认 `false` 不受影响 |
+| 验证 | `assembleDebug` / `assembleRelease` 通过；按 700 / 800 / 1104 / 1280dp 手算栏宽（700→180+96=276(39%)、800→171+96=267(33%)、1280→331+96=427(33%)）；**未在折叠屏/平板真机复验** |
 ### 引导的判定规则（重要）
 
 ```

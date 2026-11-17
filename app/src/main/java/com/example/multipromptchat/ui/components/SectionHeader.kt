@@ -11,6 +11,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 
 /** Small, low-contrast group label used above cards in the settings page. */
@@ -53,6 +54,7 @@ fun PageTitle(
     title: String,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
+    titleStyle: TextStyle = MaterialTheme.typography.headlineMedium,
     action: (@Composable () -> Unit)? = null,
 ) {
     Row(
@@ -62,7 +64,7 @@ fun PageTitle(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.headlineMedium,
+                style = titleStyle,
                 color = MaterialTheme.colorScheme.onBackground,
             )
             if (subtitle != null) {

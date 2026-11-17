@@ -65,6 +65,8 @@ fun ConversationListScreen(
     container: AppContainer,
     onOpenConversation: (Long) -> Unit,
     onNavigateToPrompts: () -> Unit,
+    /** 1.3：横屏窄栏下用紧凑表头（小标题、无副标题），避免标题与按钮挤在一起 */
+    compact: Boolean = false,
 ) {
     val viewModel: ConversationListViewModel =
         viewModel(factory = ConversationListViewModel.factory(container))
@@ -84,7 +86,12 @@ fun ConversationListScreen(
         Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
             PageTitle(
                 title = Strings.conversationsTitle,
-                subtitle = Strings.conversationCount(state.summaries.size),
+                subtitle = if (compact) null else Strings.conversationCount(state.summaries.size),
+                titleStyle = if (compact) {
+                    MaterialTheme.typography.titleLarge
+                } else {
+                    MaterialTheme.typography.headlineMedium
+                },
                 action = {
                     PillButton(
                         text = Strings.create,

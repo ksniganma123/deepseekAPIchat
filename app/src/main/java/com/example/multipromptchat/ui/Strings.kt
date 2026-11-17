@@ -11,6 +11,10 @@ object Strings {
     const val tabPrompts = "Prompt"
     const val tabSettings = "设置"
 
+    // 1.3：横屏三栏的详情占位
+    const val detailPickConversation = "请选择一个会话喵~"
+    const val detailPickPrompt = "选择或新建一个人设喵~"
+
     // Common
     const val cancel = "取消"
     const val save = "保存"

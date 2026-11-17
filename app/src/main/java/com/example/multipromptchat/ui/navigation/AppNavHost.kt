@@ -19,6 +19,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -91,6 +92,14 @@ fun AppNavHost(container: AppContainer) {
                 )
             }
 
+            // 1.3：够宽的横屏切三栏（左选项 / 中列表 / 右详情），竖屏与手机横屏保持原布局。
+            val configuration = LocalConfiguration.current
+            val isWideLandscape = configuration.screenWidthDp > configuration.screenHeightDp &&
+                configuration.screenWidthDp >= LANDSCAPE_MIN_WIDTH_DP
+
+            if (isWideLandscape) {
+                LandscapeShell(container = container)
+            } else {
             Scaffold(
                 containerColor = if (hasWallpaper) {
                     androidx.compose.ui.graphics.Color.Transparent
@@ -199,6 +208,7 @@ fun AppNavHost(container: AppContainer) {
                 }
             }
         }
+            }
 
         if (showOnboarding) {
             OnboardingScreen(

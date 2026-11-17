@@ -56,6 +56,8 @@ fun PromptListScreen(
     container: AppContainer,
     onCreatePrompt: () -> Unit,
     onEditPrompt: (Long) -> Unit,
+    /** 1.3：横屏窄栏下用紧凑表头（小标题、无副标题、隐藏「批量选择」入口） */
+    compact: Boolean = false,
 ) {
     val viewModel: PromptListViewModel = viewModel(factory = PromptListViewModel.factory(container))
     val state by viewModel.uiState.collectAsState()
@@ -74,7 +76,12 @@ fun PromptListScreen(
                 // 增量 E：选择模式下的顶部区（已选数量 / 退出 / 全选 / 删除）
                 PageTitle(
                     title = Strings.promptSelectedCount(state.selectedCount),
-                    subtitle = Strings.promptCount(state.prompts.size),
+                    subtitle = if (compact) null else Strings.promptCount(state.prompts.size),
+                    titleStyle = if (compact) {
+                        MaterialTheme.typography.titleLarge
+                    } else {
+                        MaterialTheme.typography.headlineMedium
+                    },
                     action = {
                         PillButton(
                             text = Strings.promptSelectFinish,
@@ -107,16 +114,23 @@ fun PromptListScreen(
             } else {
                 PageTitle(
                     title = Strings.promptsTitle,
-                    subtitle = Strings.promptCount(state.prompts.size),
+                    subtitle = if (compact) null else Strings.promptCount(state.prompts.size),
+                    titleStyle = if (compact) {
+                        MaterialTheme.typography.titleLarge
+                    } else {
+                        MaterialTheme.typography.headlineMedium
+                    },
                     action = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            PillButton(
-                                text = Strings.promptSelectMode,
-                                onClick = viewModel::enterSelectionMode,
-                                variant = PillVariant.Ghost,
-                                enabled = state.prompts.isNotEmpty(),
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
+                            if (!compact) {
+                                PillButton(
+                                    text = Strings.promptSelectMode,
+                                    onClick = viewModel::enterSelectionMode,
+                                    variant = PillVariant.Ghost,
+                                    enabled = state.prompts.isNotEmpty(),
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                            }
                             PillButton(
                                 text = Strings.create,
                                 onClick = onCreatePrompt,
