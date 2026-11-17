@@ -12,6 +12,7 @@ import com.example.multipromptchat.data.remote.DeepSeekClient
 import com.example.multipromptchat.data.remote.KeyCheckResult
 import com.example.multipromptchat.data.remote.ModelListResult
 import com.example.multipromptchat.data.remote.StreamChunk
+import com.example.multipromptchat.data.remote.TitleBuilder
 import com.example.multipromptchat.data.remote.TokenUsage
 import com.example.multipromptchat.domain.DEFAULT_CONVERSATION_TITLE
 import com.example.multipromptchat.domain.DEFAULT_MODEL
@@ -74,27 +75,42 @@ class ChatRepository(
     }
 
     /**
-     * 增量 C-2：首条消息后，用一次极短的非流式请求生成 ≤10 字的标题。
-     * 失败 / 关闭开关 / 已有标题时什么都不做，保留默认标题且不打扰用户。
+     * 增量 C-2：首条消息后自动给会话起个 ≤10 字的标题。
+     *
+     * 1.3 修复：
+     * - 判定放宽：标题为默认值**或空串**都视为可生成（导入/迁移来的空标题也能补上）；
+     * - 不再"AI 失败就什么都不做"：AI 拿不到结果时用首条消息做**本地兜底标题**，
+     *   保证新建会话聊完第一轮一定能看到标题；
+     * - 关闭开关时仍然完全不改标题。
      */
     suspend fun autoGenerateTitleIfNeeded(conversationId: Long) {
         if (!settingsRepository.chatExperience.value.autoGenerateTitle) return
 
         val conversation = conversationDao.getById(conversationId) ?: return
-        if (conversation.title != DEFAULT_CONVERSATION_TITLE) return
+        val currentTitle = conversation.title.trim()
+        val isGeneric = currentTitle.isEmpty() || currentTitle == DEFAULT_CONVERSATION_TITLE
+        if (!isGeneric) return
 
         val first = messageDao.firstUserMessage(conversationId)?.trim().orEmpty()
         if (first.isEmpty()) return
 
+        val fallback = TitleBuilder.localFallback(first)
+
         val apiKey = settingsRepository.getApiKey()
-        if (apiKey.isNullOrBlank()) return
+        val generated = if (apiKey.isNullOrBlank()) {
+            null
+        } else {
+            runCatching {
+                deepSeekClient.generateTitle(
+                    apiKey = apiKey,
+                    userMessage = first,
+                    model = currentModel(),
+                )
+            }.getOrNull()
+        }
 
-        val generated = runCatching {
-            deepSeekClient.generateTitle(apiKey = apiKey, userMessage = first, model = currentModel())
-        }.getOrNull()
-        if (generated.isNullOrBlank()) return
-
-        conversationDao.rename(conversationId, generated, System.currentTimeMillis())
+        val finalTitle = generated ?: fallback ?: return
+        conversationDao.rename(conversationId, finalTitle, System.currentTimeMillis())
     }
 
     /** 增量 C-5：把一次请求的 usage 累加到会话上。 */

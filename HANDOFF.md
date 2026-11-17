@@ -93,6 +93,16 @@
 | 表格 | `MdTable` 改为列宽等权 `weight(1f)` + `fillMaxWidth`，列数 >4 才回退横向滚动；新增私有 `RowScope.MdTableCell` |
 | 系统栏 | `AppNavHost` 的 NavHost 增加 `windowInsetsPadding(WindowInsets.safeDrawing.only(Horizontal))`，横屏侧边系统栏/刘海不再压住内容；竖屏左右 inset 为 0，行为不变 |
 | 验证 | `assembleDebug` / `assembleRelease` 通过；按 360 / 600 / 800 / 1280dp 手算气泡与内容列宽度，均无溢出重叠；**未在折叠屏真机复验** |
+### I. 1.3 修复：首轮对话后标题不自动生成
+
+| 项 | 内容 |
+| --- | --- |
+| 现象 | 新建会话发第一条消息后，标题一直停在「新会话」。 |
+| 根因 1（主要） | `generateTitle` 只发一种参数组合（system 消息 + `temperature`/`top_p` + `max_tokens=32`）。官方文档里 `deepseek-reasoner` 这类模型**不支持 system 消息、也不支持采样参数**；且 32 tokens 的输出预算很可能被推理内容吃掉，`content` 返回空串 → 旧实现直接 `return null`，仓库层再 `return`，于是静默失败。 |
+| 根因 2 | 旧实现只读 `choices[0].message.content`，没有读文档里并列的 `reasoning_content`；内容落在后者时同样判空。 |
+| 根因 3 | 判定条件写死 `title != DEFAULT_CONVERSATION_TITLE`，空标题（导入/迁移）永远不补；且**没有任何本地兜底**。 |
+| 修复 | ① 新增纯逻辑 `TitleBuilder`（`sanitize` 清洗前缀/引号/Markdown/句末标点 + `localFallback` 首条消息截断）；② `generateTitle` 改两段式：常规组合失败后，改发「仅 user、不带 temperature/top_p」的请求，并从 `content` → `reasoning_content` 依次取候选；③ `max_tokens` 32 → 64，输入截断常量独立；④ `complete()` 的 `temperature`/`topP` 改为可空（null 即不下发），`CompletionResult.Success` 增加 `reasoning`；⑤ 仓库层：标题为空或等于默认值都尝试，AI 拿不到就用本地兜底标题。 |
+| 验证 | kotlinc 跑了 14 条纯逻辑断言（清洗前缀/粗体/首行/截断 10 字/占位词/空白/null；本地兜底：普通问句/有序列表前缀/`##` 标题/取首句/空白/null），全部 PASS；`assembleDebug` / `assembleRelease` 通过。**未在真机上对真实模型复验**（需要 API Key 与额度）。 |
 ### 引导的判定规则（重要）
 
 ```

@@ -54,7 +54,12 @@ sealed interface ModelListResult {
 
 /** 非流式请求的结果（增量 C-4：关闭流式时走这里）。 */
 sealed interface CompletionResult {
-    data class Success(val content: String, val usage: TokenUsage?) : CompletionResult
+    data class Success(
+        val content: String,
+        val usage: TokenUsage?,
+        /** deepseek-reasoner 等模型会把思考过程放在这里，内容为空时可作为降级候选。 */
+        val reasoning: String? = null,
+    ) : CompletionResult
     data class Failure(val message: String) : CompletionResult
 }
 
@@ -257,8 +262,8 @@ class DeepSeekClient(
         apiKey: String,
         model: String,
         messages: List<ChatMessage>,
-        temperature: Float,
-        topP: Float,
+        temperature: Float? = null,
+        topP: Float? = null,
         maxTokens: Int? = null,
     ): CompletionResult = withContext(Dispatchers.IO) {
         val payload = buildPayload(model, messages, temperature, topP, stream = false).apply {
@@ -287,7 +292,13 @@ class DeepSeekClient(
                 val usage = TokenUsage.fromJson(
                     if (json.isNull("usage")) null else json.optJSONObject("usage")
                 )
-                CompletionResult.Success(content = content, usage = usage)
+                val message = json.optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")
+                val reasoning = if (message == null || message.isNull("reasoning_content")) {
+                    null
+                } else {
+                    message.optString("reasoning_content", "").takeIf { it.isNotBlank() }
+                }
+                CompletionResult.Success(content = content, usage = usage, reasoning = reasoning)
             }
         } catch (t: SocketTimeoutException) {
             CompletionResult.Failure("请求超时，请检查网络后重试")
@@ -302,45 +313,55 @@ class DeepSeekClient(
 
     /**
      * 增量 C-2：用一次极短的非流式请求生成 10 字以内的会话标题。
-     * 任何失败都返回 null，调用方保留默认标题、不打扰用户。
+     *
+     * 1.3 修复：改成两段式，兼容不同模型的参数支持差异 ——
+     * 官方文档里 `deepseek-reasoner` 这类模型不支持 system 消息、也不支持
+     * temperature / top_p；老实现只会硬发一种组合，失败即静默放弃。
+     *
+     * 抛出的所有异常都被吞掉；调用方拿 null 时会用本地兜底标题（见 TitleBuilder）。
      */
     suspend fun generateTitle(
         apiKey: String,
         userMessage: String,
         model: String = DEFAULT_MODEL,
     ): String? {
-        val messages = listOf(
-            ChatMessage(role = "system", content = TITLE_SYSTEM_PROMPT),
-            ChatMessage(role = "user", content = userMessage.take(400)),
-        )
-        val result = runCatching {
+        val prompt = userMessage.take(TITLE_INPUT_MAX_CHARS)
+
+        // 尝试 1：system 指令 + 采样参数（deepseek-chat / flash 的常规路径）
+        val firstAttempt = runCatching {
             complete(
                 apiKey = apiKey,
                 model = model,
-                messages = messages,
+                messages = listOf(
+                    ChatMessage(role = "system", content = TITLE_SYSTEM_PROMPT),
+                    ChatMessage(role = "user", content = prompt),
+                ),
                 temperature = 0.3f,
                 topP = 0.9f,
-                maxTokens = 32,
+                maxTokens = TITLE_MAX_TOKENS,
             )
         }.getOrNull()
-        val content = (result as? CompletionResult.Success)?.content ?: return null
-        return sanitizeTitle(content)
-    }
 
-    private fun sanitizeTitle(raw: String): String? {
-        val cleaned = raw
-            .replace("\n", " ")
-            .replace("\r", " ")
-            .replace("\"", "")
-            .replace("“", "")
-            .replace("”", "")
-            .replace("「", "")
-            .replace("」", "")
-            .replace("《", "")
-            .replace("》", "")
-            .trim()
-        if (cleaned.isEmpty()) return null
-        return cleaned.take(TITLE_MAX_CHARS).trim().ifEmpty { null }
+        (firstAttempt as? CompletionResult.Success)?.let { success ->
+            TitleBuilder.sanitize(success.content)?.let { return it }
+        }
+
+        // 尝试 2：不带 system、不带温度参数（reasoner 等模型）
+        val secondAttempt = runCatching {
+            complete(
+                apiKey = apiKey,
+                model = model,
+                messages = listOf(ChatMessage(role = "user", content = TITLE_USER_PROMPT + prompt)),
+                temperature = null,
+                topP = null,
+                maxTokens = TITLE_MAX_TOKENS,
+            )
+        }.getOrNull()
+
+        val second = secondAttempt as? CompletionResult.Success ?: return null
+        // content 为空时退一步看 reasoning_content（文档里两者并列返回）
+        return TitleBuilder.sanitize(second.content)
+            ?: TitleBuilder.sanitize(second.reasoning)
     }
 
     private fun buildRequest(apiKey: String, payload: JSONObject): Request =
@@ -355,8 +376,8 @@ class DeepSeekClient(
     private fun buildPayload(
         model: String,
         messages: List<ChatMessage>,
-        temperature: Float,
-        topP: Float,
+        temperature: Float? = null,
+        topP: Float? = null,
         stream: Boolean = true,
     ): JSONObject {
         val array = JSONArray()
@@ -400,8 +421,9 @@ class DeepSeekClient(
                     JSONObject().apply { put("include_usage", true) },
                 )
             }
-            put("temperature", temperature.coerceIn(0f, 2f).toDouble())
-            put("top_p", topP.coerceIn(0f, 1f).toDouble())
+            // 可空：某些模型（如 deepseek-reasoner）不支持采样参数，此时不下发
+            temperature?.let { put("temperature", it.coerceIn(0f, 2f).toDouble()) }
+            topP?.let { put("top_p", it.coerceIn(0f, 1f).toDouble()) }
             put("messages", array)
         }
     }
@@ -428,9 +450,20 @@ class DeepSeekClient(
         private val JSON_MEDIA_TYPE = JSON_MEDIA_TYPE_VALUE.toMediaType()
 
         const val TITLE_MAX_CHARS = 10
+
+        /** 标题请求的输出预算：太小会被推理内容吃掉，导致 content 为空。 */
+        private const val TITLE_MAX_TOKENS = 64
+
+        /** 送进标题请求的用户文本上限（字节/字符都不宜过大）。 */
+        private const val TITLE_INPUT_MAX_CHARS = 400
+
         private const val TITLE_SYSTEM_PROMPT =
             "你负责给对话起标题。只输出一个不超过10个字的中文标题，" +
                 "不要标点、不要引号、不要解释、不要换行。"
+
+        /** 无 system 权限的模型走这条：把要求写进 user 里。 */
+        private const val TITLE_USER_PROMPT =
+            "用不超过10个字概括下面这句话的主题，只输出标题本身，不要标点、引号或解释：\n"
 
         /**
          * Streaming-friendly client: no overall call timeout, and a generous read
