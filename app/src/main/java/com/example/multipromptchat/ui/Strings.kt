@@ -100,7 +100,7 @@ object Strings {
     const val aboutSection = "关于"
     const val appName = "deepseekAPIchat"
     const val appTagline = "多 Prompt 人设 · 流式对话"
-    const val appVersion = "版本 1.5"
+    const val appVersion = "版本 1.5.1"
     const val copyrightHolder = "© 2026 K5NGM_JiYuxi"
     const val licenseSummary = "本项目以 MIT 协议开源：可自由使用、修改、分发，请保留版权声明与许可声明。"
     const val viewLicense = "查看许可证文本"

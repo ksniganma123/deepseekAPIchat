@@ -123,6 +123,16 @@
 | 透明度 | `AppearanceSettings.backgroundOpacity`（0.05~0.95，默认 0.18，key `appearance_background_opacity`）；渲染时蒙层 alpha = `1 - opacity`，设置页「外观 → 聊天背景图」内滑杆，`Slider` 每次变化即写入并推给 `AppNavHost`，即时生效且持久化 |
 | 版本 | `versionCode 5` / `versionName 1.5` |
 | 验证 | `assembleDebug` / `assembleRelease` 通过；`dist/deepseekAPIchat-1.5.apk` 的 aapt2 已核 1.5/5。**未在真机验证**滑杆观感与颜文字在各字体的显示 |
+### L. 1.5.1：修复背景图「完全失效」
+
+| 项 | 内容 |
+| --- | --- |
+| 现象 | 设置背景图后界面没有任何变化 |
+| 根因 | 1.3 起新增的 `LandscapeShell` 根容器是 `Surface(color = MaterialTheme.colorScheme.background)`——**不透明底色**。1.4 把三栏门控降到实测 520dp 后，宽窗口（含桌面 VM）一律走三栏分支，于是它把 `AppNavHost` 里铺好的 `Image + 蒙层` 整块盖住；竖屏分支（`Scaffold` 的 `containerColor = Transparent`）不受影响，所以看起来像"背景图功能完全没做" |
+| 修复 | `LandscapeShell` 的 `Surface` 改为：`LocalWallpaperActive` 为真时用 `Color.Transparent`，否则保持原背景色 |
+| 复核 | 全项目只剩 `OnboardingScreen` 一个不透明根（全屏引导，符合预期）；5 个页面根都走 `screenBackgroundColor()`；蒙层 alpha 仍是 `1 - backgroundOpacity` |
+| 版本 | `versionCode 6` / `versionName 1.5.1` |
+| 验证 | `assembleDebug` / `assembleRelease` 通过；`dist/deepseekAPIchat-1.5.1.apk` aapt2 已核 1.5.1/6。**未在真机复验**（需要装 1.5.1 后设图 + 调透明度看效果） |
 ### 引导的判定规则（重要）
 
 ```

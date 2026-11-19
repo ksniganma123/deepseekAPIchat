@@ -40,7 +40,7 @@
 
 **1. 安装**
 
-- 用现成包：仓库的 Release 附件或 `dist/deepseekAPIchat-1.5.apk`（约 8.7 MB，`versionName 1.5` / `versionCode 5`）。拷进手机点击安装，需允许「未知来源」。
+- 用现成包：仓库的 Release 附件或 `dist/deepseekAPIchat-1.5.1.apk`（约 8.7 MB，`versionName 1.5.1` / `versionCode 6`）。拷进手机点击安装，需允许「未知来源」。
 - 自己编译：见 [构建环境与命令](#构建环境与命令)。
 
 **预期**：桌面出现「deepseekAPIchat」图标。

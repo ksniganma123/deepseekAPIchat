@@ -50,6 +50,7 @@ import com.example.multipromptchat.ui.conversations.ConversationListScreen
 import com.example.multipromptchat.ui.prompts.PromptEditScreen
 import com.example.multipromptchat.ui.prompts.PromptListScreen
 import com.example.multipromptchat.ui.settings.SettingsScreen
+import com.example.multipromptchat.ui.theme.LocalWallpaperActive
 
 /**
  * 1.3：微信桌面式的横屏三栏布局。
@@ -83,7 +84,15 @@ fun LandscapeShell(container: AppContainer) {
     var openConversationId by rememberSaveable { mutableStateOf(-1L) }
     var openPromptId by rememberSaveable { mutableStateOf(-1L) } // -2 = 新建
 
-    Surface(color = MaterialTheme.colorScheme.background) {
+    // 1.5.1：根容器不能是不透明底色，否则会把 AppNavHost 里铺的背景图整块盖掉；
+    // 有背景图时走透明，让下面的 Image + 蒙层透上来。
+    Surface(
+        color = if (LocalWallpaperActive.current) {
+            androidx.compose.ui.graphics.Color.Transparent
+        } else {
+            MaterialTheme.colorScheme.background
+        },
+    ) {
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
